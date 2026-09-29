@@ -110,6 +110,9 @@ include("${PSPDEV}/psp/share/CreatePBP.cmake")
 create_pbp_file(
     TARGET keeperfx
     TITLE "KeeperFX"
+    # Must not be empty: an empty APP_VER string makes the XMB reject the
+    # PARAM.SFO (no title shown, and the game refuses to start).
+    VERSION "01.40"
     ICON_PATH "${CMAKE_SOURCE_DIR}/psp/ICON0.PNG"
     BACKGROUND_PATH NULL
     PREVIEW_PATH NULL
