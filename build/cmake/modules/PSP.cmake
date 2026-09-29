@@ -98,7 +98,7 @@ include("${PSPDEV}/psp/share/CreatePBP.cmake")
 create_pbp_file(
     TARGET keeperfx
     TITLE "KeeperFX"
-    ICON_PATH NULL
+    ICON_PATH "${CMAKE_SOURCE_DIR}/psp/ICON0.PNG"
     BACKGROUND_PATH NULL
     PREVIEW_PATH NULL
     MEMSIZE 1 # PSP-2000+ extended (~52 MB) user memory

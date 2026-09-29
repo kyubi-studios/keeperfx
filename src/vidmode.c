@@ -685,7 +685,6 @@ TbScreenMode setup_screen_mode(TbScreenMode nmode, TbBool failsafe)
         FreeMcgaData();
       }
     }
-    if (!hi_res) ERRORLOG("MCGA Minimal not allowed (Reset)");
     MinimalResolutionSetup = false;
   }
   hi_res = ((new_mdinfo->Height < 400) ? false : true);

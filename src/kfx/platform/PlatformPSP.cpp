@@ -13,6 +13,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <pspkernel.h>
+#include <psppower.h>
 #include <cstdio>
 #include <cstring>
 #include "post_inc.h"
@@ -63,6 +64,8 @@ static int append_args_file(int argc, char **argv, char **out, int max_args)
 
 int main(int argc, char *argv[])
 {
+    // Homebrew starts at 222 MHz; the game needs the full 333 MHz.
+    scePowerSetClockFrequency(333, 333, 166);
     static char* args[64];
     int nargs = append_args_file(argc, argv, args, 63);
     args[nargs] = NULL;

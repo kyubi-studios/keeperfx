@@ -471,9 +471,63 @@ void init_custom_campaign_sprites(const char *dir_path, const char *dir_desc)
     }
 }
 
+#if defined(KFX_PSP)
+/**
+ * Describes every source init_custom_sprites() would load from. Sprite files
+ * don't change while the game runs, so an unchanged description means the
+ * loaded sprites are still valid; the PSP skips the ~20 s reload then.
+ */
+static void describe_custom_sprite_sources(LevelNumber lvnum, char *buf, size_t size)
+{
+    int len = 0;
+    buf[0] = '\0';
+    const char *dir_path = prepare_file_path(FGrp_CmpgConfig, NULL);
+    if (dir_path != NULL && dir_path[0] != 0)
+    {
+        // Only the zips actually present matter, not the directory itself.
+        char pattern[1024];
+        snprintf(pattern, sizeof(pattern), "%s/*.zip", dir_path);
+        struct TbFileEntry fe;
+        struct TbFileFind *ff = LbFileFindFirst(pattern, &fe);
+        if (ff) {
+            do {
+                len += snprintf(buf + len, size - len, "%s/%s|", dir_path, fe.Filename);
+            } while (LbFileFindNext(ff, &fe) >= 0 && len < (int)size);
+            LbFileFindEnd(ff);
+        }
+    }
+    const char *fname = prepare_file_fmtpath(get_level_fgroup(lvnum), "map%05lu.zip", lvnum);
+    if (fname[0] != '\0' && LbFileExists(fname))
+        len += snprintf(buf + len, size - len, "%s|", fname);
+    const struct ModConfigItem *lists[] = {mods_conf.after_base_item, mods_conf.after_campaign_item, mods_conf.after_map_item};
+    const long counts[] = {mods_conf.after_base_cnt, mods_conf.after_campaign_cnt, mods_conf.after_map_cnt};
+    for (int l = 0; l < 3; l++)
+    {
+        for (long i = 0; i < counts[l] && len < (int)size; i++)
+            len += snprintf(buf + len, size - len, "%d:%s|", l, lists[l][i].name);
+    }
+}
+#endif
+
 void init_custom_sprites(LevelNumber lvnum)
 {
     SYNCDBG(8, "Starting");
+#if defined(KFX_PSP)
+    {
+        static char loaded_sources[2048] = "";
+        char sources[2048];
+        LevelNumber src_lvnum = (lvnum == SPRITE_LAST_LEVEL) ? game.last_level : lvnum;
+        describe_custom_sprite_sources(src_lvnum, sources, sizeof(sources));
+        if (custom_sprites != NULL && strcmp(sources, loaded_sources) == 0)
+        {
+            if (lvnum > 0 && lvnum != SPRITE_LAST_LEVEL)
+                game.last_level = lvnum;
+            SYNCDBG(7, "Custom sprite sources unchanged, keeping loaded sprites");
+            return;
+        }
+        strcpy(loaded_sources, sources);
+    }
+#endif
     free_spritesheet(&custom_sprites);
     custom_sprites = create_spritesheet();
     memset(required_sprite_zip_checksums, 0, sizeof(required_sprite_zip_checksums));
@@ -547,7 +601,10 @@ void init_custom_sprites(LevelNumber lvnum)
                 ERRORLOG("Required /fxdata/%s is missing", required_sprite_zips[i]);
                 continue;
             }
+#if !defined(KFX_NO_NETWORK)
+            // Only compared between multiplayer peers.
             required_sprite_zip_checksums[i] = calculate_file_checksum(full_path);
+#endif
             int add_flag = load_file_sprites(full_path, NULL, normal_load_flags);
             if (add_flag & CLF_Sprites) {
                 cnt_sprite++;
