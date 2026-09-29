@@ -6,7 +6,12 @@
 #include "bflib_keybrd.h"
 #include "bflib_fileio.h"
 #include "kjm_input.h"
+#include "bflib_joyst.h"
 
+#if defined(KFX_FMV_SMACKER)
+// Lightweight Smacker-only playback (libsmacker), for platforms without FFmpeg.
+#include <smacker.h>
+#else
 // See: https://trac.ffmpeg.org/ticket/3626
 extern "C" {
 	#include <libavformat/avformat.h>
@@ -15,6 +20,7 @@ extern "C" {
 	#include <libswresample/swresample.h>
     #pragma GCC diagnostic warning "-Wdeprecated-declarations"
 }
+#endif
 
 #include <cstdio>
 #include <string>
@@ -28,7 +34,19 @@ extern "C" {
 
 namespace {
 
-static void compute_scaled_video_rect(const AVFrame & frame, const int flags,
+/** Any gamepad button skips a movie. Checked directly because key bindings
+ *  aren't loaded yet when the intro plays. */
+static bool controller_skip_pressed()
+{
+	const TbControllerButtons skip_buttons = CBtn_A | CBtn_B | CBtn_X | CBtn_Y |
+		CBtn_START | CBtn_BACK | CBtn_LEFTSHOULDER | CBtn_RIGHTSHOULDER;
+	if ((controller_button_state & skip_buttons) == 0)
+		return false;
+	controller_button_state &= ~skip_buttons;
+	return true;
+}
+
+static void compute_scaled_video_rect(const int frame_width, const int frame_height, const int flags,
 	const int scanline, const int nlines,
 	int * out_spw, int * out_sph, int * out_dst_width, int * out_dst_height)
 {
@@ -43,8 +61,8 @@ static void compute_scaled_video_rect(const AVFrame & frame, const int flags,
 		dst_height = nlines;
 	} else {
 		// Calculate the correct output size
-		int in_width = frame.width;
-		int in_height = frame.height;
+		int in_width = frame_width;
+		int in_height = frame_height;
 		float units_per_px = 0;
 		// relative aspect ratio difference between the source frame and destination frame
 		const float relative_ar_difference = (in_width * 1.0 / in_height * 1.0) / (scanline * 1.0 / nlines * 1.0);
@@ -52,7 +70,7 @@ static void compute_scaled_video_rect(const AVFrame & frame, const int flags,
 		float comparison_ratio = 1;
 		if ((flags & SMK_FullscreenStretch) && (flags & SMK_FullscreenFit)) {
 			// stretch source from 320x200(16:10) to 320x240 (4:3) (i.e. vertical x 1.2) - "preserve *original* aspect ratio mode"
-			if (frame.width == 320 && frame.height == 200) {
+			if (frame_width == 320 && frame_height == 200) {
 				in_height = (int)(in_height * 1.2);
 			}
 		}
@@ -76,7 +94,7 @@ static void compute_scaled_video_rect(const AVFrame & frame, const int flags,
 			// Find the highest integer scale possible
 			if (flags & SMK_FullscreenStretch) {
 				//4:3 stretch mode (crop off to the nearest 5x/6x scale
-				if (frame.width == 320 && frame.height == 200) {
+				if (frame_width == 320 && frame_height == 200) {
 					// make sure the multiple is integer divisible by 5. Use 5x as a minimum,
 					// otherwise there will be no video (resolutions smaller than 1600x1200
 					// will have a cropped image from a buffer of that size).
@@ -99,6 +117,7 @@ static void compute_scaled_video_rect(const AVFrame & frame, const int flags,
 	*out_dst_height = dst_height;
 }
 
+#if !defined(KFX_FMV_SMACKER)
 struct movie_t {
 
 	using clock = std::chrono::high_resolution_clock;
@@ -376,7 +395,7 @@ struct movie_t {
 		present_desc.palette = PRESENT_PALETTE_EMBEDDED;
 		present_desc.embedded_palette = m_frame->data[1];
 		if (scaling_mode) {
-			compute_scaled_video_rect(*m_frame, m_flags, RendererScreenWidth(), RendererScreenHeight(),
+			compute_scaled_video_rect(m_frame->width, m_frame->height, m_flags, RendererScreenWidth(), RendererScreenHeight(),
 				&present_desc.dst_x, &present_desc.dst_y, &present_desc.dst_w, &present_desc.dst_h);
 		} else {
 			const int dst_w = (m_flags & SMK_PixelDoubleWidth) ? 2 * m_frame->width : m_frame->width;
@@ -431,7 +450,7 @@ struct movie_t {
 				return false;
 			} else if (m_flags & SMK_NoStopOnUserInput) {
 				return true;
-			} else if (lbKeyOn[KC_ESCAPE] || lbKeyOn[KC_RETURN] || lbKeyOn[KC_SPACE] || lbDisplay.LeftButton) {
+			} else if (lbKeyOn[KC_ESCAPE] || lbKeyOn[KC_RETURN] || lbKeyOn[KC_SPACE] || lbDisplay.LeftButton || controller_skip_pressed()) {
 				clear_key_pressed(lbInkey);
 				return false;
 			}
@@ -496,6 +515,184 @@ extern "C" TbBool play_smk(const char * filename, const int flags) {
 	}
 	return false;
 }
+#else // KFX_FMV_SMACKER
+// (the FFmpeg branch above closes the anonymous namespace; continue it here)
+
+/** Plays a Smacker file streamed from disk: video through the renderer's
+ *  paletted present path, the first audio track through an SDL stream. */
+struct smacker_movie_t {
+	smk m_smk = nullptr;
+	SDL_AudioStream * m_audio = nullptr;
+	int m_flags;
+	unsigned long m_width = 0;
+	unsigned long m_height = 0;
+	unsigned char m_y_scale = SMK_FLAG_Y_NONE;
+	unsigned long m_frame_count = 0;
+	double m_usec_per_frame = 0;
+	int m_audio_track = -1;
+	int m_audio_bytes_per_sec = 0;
+	unsigned char m_bgra[256 * 4];
+
+	smacker_movie_t(const char * filename, const int flags) : m_flags(flags) {
+		m_smk = smk_open_file(filename, SMK_MODE_DISK);
+		if (!m_smk) {
+			throw std::runtime_error("Cannot open Smacker file");
+		}
+		smk_info_all(m_smk, nullptr, &m_frame_count, &m_usec_per_frame);
+		smk_info_video(m_smk, &m_width, &m_height, &m_y_scale);
+		smk_enable_all(m_smk, SMK_VIDEO_TRACK);
+		if (!flag_is_set(m_flags, SMK_NoSound)) {
+			open_audio();
+		}
+		SYNCLOG("Playing %s: %lux%lu, %lu frames at %.1f fps, y-scale %d, audio track %d", filename,
+			m_width, m_height, m_frame_count, m_usec_per_frame > 0 ? 1000000.0 / m_usec_per_frame : 0.0, (int)m_y_scale, m_audio_track);
+	}
+
+	~smacker_movie_t() noexcept {
+		if (m_audio) {
+			SDL_DestroyAudioStream(m_audio);
+		}
+		if (m_smk) {
+			smk_close(m_smk);
+		}
+	}
+
+	void open_audio() {
+		unsigned char track_mask = 0;
+		unsigned char channels[7];
+		unsigned char bitdepth[7];
+		unsigned long rate[7];
+		smk_info_audio(m_smk, &track_mask, channels, bitdepth, rate);
+		for (int track = 0; track < 7; track++) {
+			if (!(track_mask & (1 << track))) {
+				continue;
+			}
+			SDL_AudioSpec spec;
+			spec.format = (bitdepth[track] == 16) ? SDL_AUDIO_S16LE : SDL_AUDIO_U8;
+			spec.channels = channels[track];
+			spec.freq = (int)rate[track];
+			m_audio = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr);
+			if (!m_audio) {
+				WARNLOG("Cannot open audio for video: %s", SDL_GetError());
+				return;
+			}
+			smk_enable_audio(m_smk, track, 1);
+			m_audio_track = track;
+			m_audio_bytes_per_sec = spec.freq * spec.channels * (int)SDL_AUDIO_BYTESIZE(spec.format);
+			SDL_ResumeAudioStreamDevice(m_audio);
+			return;
+		}
+	}
+
+	void queue_audio() {
+		if (m_audio_track < 0) {
+			return;
+		}
+		const unsigned long size = smk_get_audio_size(m_smk, m_audio_track);
+		// Don't let the queue grow without bound if the device isn't draining it.
+		if (size > 0 && SDL_GetAudioStreamQueued(m_audio) < 2 * m_audio_bytes_per_sec) {
+			SDL_PutAudioStreamData(m_audio, smk_get_audio(m_smk, m_audio_track), (int)size);
+		}
+	}
+
+	void output_video_frame() {
+		const unsigned char * pal = smk_get_palette(m_smk);
+		for (int i = 0; i < 256; i++) {
+			m_bgra[i * 4 + 0] = pal[i * 3 + 2];
+			m_bgra[i * 4 + 1] = pal[i * 3 + 1];
+			m_bgra[i * 4 + 2] = pal[i * 3 + 0];
+			m_bgra[i * 4 + 3] = 0xFF;
+		}
+		if (!RendererBeginFrame()) {
+			return;
+		}
+		// Line-doubled/interlaced Smacker files store half-height frames.
+		const int shown_height = (m_y_scale != SMK_FLAG_Y_NONE) ? (int)m_height * 2 : (int)m_height;
+		const bool scaling_mode = (m_flags & (SMK_FullscreenFit | SMK_FullscreenStretch | SMK_FullscreenCrop)) != 0;
+		struct RendererPresentImageDesc present_desc = {};
+		present_desc.src = smk_get_video(m_smk);
+		present_desc.src_pitch = (int)m_width;
+		present_desc.src_w = (int)m_width;
+		present_desc.src_h = (int)m_height;
+		present_desc.palette = PRESENT_PALETTE_EMBEDDED;
+		present_desc.embedded_palette = m_bgra;
+		if (scaling_mode) {
+			compute_scaled_video_rect((int)m_width, shown_height, m_flags, RendererScreenWidth(), RendererScreenHeight(),
+				&present_desc.dst_x, &present_desc.dst_y, &present_desc.dst_w, &present_desc.dst_h);
+		} else {
+			const int dst_w = (m_flags & SMK_PixelDoubleWidth) ? 2 * (int)m_width : (int)m_width;
+			const int dst_h = (m_flags & (SMK_PixelDoubleLine | SMK_InterlaceLine)) ? 2 * shown_height : shown_height;
+			present_desc.dst_x = (RendererPhysicalWidth() - dst_w) >> 1;
+			present_desc.dst_y = (RendererPhysicalHeight() - dst_h) >> 1;
+			present_desc.dst_w = dst_w;
+			present_desc.dst_h = dst_h;
+		}
+		RendererPresentImage(&present_desc);
+		RendererEndFrame();
+		RendererPresentFrame();
+	}
+
+	/** @return false when the user asked to stop. */
+	bool poll_stop() {
+		if (!poll_inputs()) {
+			return true;
+		}
+		if (m_flags & SMK_NoStopOnUserInput) {
+			return false;
+		}
+		if (lbKeyOn[KC_ESCAPE] || lbKeyOn[KC_RETURN] || lbKeyOn[KC_SPACE] || lbDisplay.LeftButton || controller_skip_pressed()) {
+			clear_key_pressed(lbInkey);
+			return true;
+		}
+		return false;
+	}
+
+	void play() {
+		const Uint64 start_ns = SDL_GetTicksNS();
+		const Uint64 frame_ns = (Uint64)(m_usec_per_frame * 1000.0);
+		unsigned long frame = 0;
+		for (char r = smk_first(m_smk); r == SMK_MORE || r == SMK_LAST; r = smk_next(m_smk), frame++) {
+			queue_audio();
+			const Uint64 due_ns = start_ns + frame * frame_ns;
+			const Uint64 now_ns = SDL_GetTicksNS();
+			if (now_ns < due_ns) {
+				SDL_DelayNS(due_ns - now_ns);
+			}
+			// Drop frames that are already late so audio stays in sync
+			// on slow hardware; the frame data is decoded regardless.
+			if (now_ns < due_ns + frame_ns || r == SMK_LAST) {
+				output_video_frame();
+			}
+			if (poll_stop() || r == SMK_LAST) {
+				break;
+			}
+		}
+		// Let the tail of the soundtrack play out, but never wait longer than
+		// what is still queued (plus a margin) in case the device stalls.
+		if (m_audio) {
+			const int queued = SDL_GetAudioStreamQueued(m_audio);
+			const Uint64 deadline = SDL_GetTicks() + (m_audio_bytes_per_sec > 0 ? (Uint64)queued * 1000 / m_audio_bytes_per_sec : 0) + 250;
+			while (SDL_GetAudioStreamQueued(m_audio) > 0 && SDL_GetTicks() < deadline && !poll_stop()) {
+				SDL_Delay(10);
+			}
+		}
+	}
+};
+
+} // local
+
+extern "C" TbBool play_smk(const char * filename, const int flags) {
+	try {
+		lbDisplay.LeftButton = 0; // hack?
+		smacker_movie_t movie(filename, flags);
+		movie.play();
+		return true;
+	} catch (const std::exception & e) {
+		ERRORLOG("Error playing %s: %s", filename, e.what());
+	}
+	return false;
+}
+#endif // KFX_FMV_SMACKER
 
 namespace {
 

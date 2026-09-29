@@ -3,7 +3,7 @@
 #   psp-cmake -S . -B out-psp -DCMAKE_BUILD_TYPE=Release && cmake --build out-psp
 #
 # Software renderer only (no OpenGL), no networking (enet/curl/upnp stubbed),
-# no FMV (ffmpeg stubbed). SDL3 / SDL3_mixer / SDL3_image / OpenAL / Lua 5.4 /
+# FMV through libsmacker instead of ffmpeg. SDL3 / SDL3_mixer / SDL3_image / OpenAL / Lua 5.4 /
 # zlib / minizip come from pspdev; spng, centijson and astronomy are compiled
 # from the sources vendored under deps/psp/.
 
@@ -11,7 +11,7 @@ kfx_status("PLATFORM" "Sony PSP (MIPS Allegrex, pspdev)")
 
 set(KFX_PSP_DEPS "${CMAKE_SOURCE_DIR}/deps/psp")
 
-add_compile_definitions("DEBUG=$<IF:$<CONFIG:Debug>,1,0>" _GNU_SOURCE KFX_PSP=1 KFX_NO_OPENGL=1 KFX_NO_NETWORK=1 KFX_NO_FMV=1 KFX_LAZY_SOUND_BANKS=1)
+add_compile_definitions("DEBUG=$<IF:$<CONFIG:Debug>,1,0>" _GNU_SOURCE KFX_PSP=1 KFX_NO_OPENGL=1 KFX_NO_NETWORK=1 KFX_FMV_SMACKER=1 KFX_LAZY_SOUND_BANKS=1)
 
 # ---- Sources ----
 file(GLOB_RECURSE KEEPERFX_SOURCES_C   CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
@@ -20,8 +20,8 @@ list(FILTER KEEPERFX_SOURCES_C   EXCLUDE REGEX "/src/ftests/")
 list(FILTER KEEPERFX_SOURCES_CXX EXCLUDE REGEX "/src/ftests/")
 list(FILTER KEEPERFX_SOURCES_CXX EXCLUDE REGEX "/PlatformWindows\\.cpp$|/WindowCompositorWin\\.cpp$|/GLContextSDL\\.cpp$")
 list(FILTER KEEPERFX_SOURCES_CXX EXCLUDE REGEX "/kfx/renderer/opengl/|/RendererOpenGL\\.cpp$")
-# Networking / FMV backends, replaced by src/psp/*_stub.* below.
-list(FILTER KEEPERFX_SOURCES_CXX EXCLUDE REGEX "/bflib_enet\\.cpp$|/net_portforward\\.cpp$|/bflib_fmvids\\.cpp$")
+# Networking backends, replaced by src/psp/net_stub.c.
+list(FILTER KEEPERFX_SOURCES_CXX EXCLUDE REGEX "/bflib_enet\\.cpp$|/net_portforward\\.cpp$")
 list(FILTER KEEPERFX_SOURCES_C   EXCLUDE REGEX "/net_lan\\.c$|/net_holepunch\\.c$|/net_matchmaking\\.c$")
 
 # Window icon (referenced by WindowSystemSDL; harmless on the PSP).
@@ -66,13 +66,16 @@ add_library(kfx_minizip STATIC
 target_include_directories(kfx_minizip PUBLIC "${KFX_PSP_DEPS}/minizip")
 target_compile_definitions(kfx_minizip PRIVATE NOCRYPT USE_FILE32API)
 
+add_library(kfx_smacker STATIC "${KFX_PSP_DEPS}/libsmacker/smacker.c")
+target_include_directories(kfx_smacker PUBLIC "${KFX_PSP_DEPS}/libsmacker")
+
 add_library(centitoml OBJECT "${CMAKE_SOURCE_DIR}/deps/centitoml/toml_api.c")
 target_link_libraries(centitoml PUBLIC kfx_centijson)
 target_include_directories(centitoml INTERFACE "${CMAKE_SOURCE_DIR}/deps/centitoml")
 
 # ---- pspdev libraries ----
 target_link_libraries(keeperfx PRIVATE
-    kfx_spng kfx_centijson kfx_astronomy kfx_minizip centitoml
+    kfx_spng kfx_centijson kfx_astronomy kfx_minizip kfx_smacker centitoml
     SDL3_mixer SDL3_image SDL3
     openal lua z
     xmp-lite vorbisfile vorbis ogg FLAC mpg123 opusfile opus png jpeg

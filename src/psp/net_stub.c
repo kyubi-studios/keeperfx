@@ -1,16 +1,14 @@
 /******************************************************************************/
 // Free implementation of Bullfrog's Dungeon Keeper strategy game.
 /******************************************************************************/
-/** @file net_fmv_stub.c
- *     PSP replacements for the networking (enet/curl/upnp) and FMV (ffmpeg)
- *     backends, which are not built for the PSP. Networking reports itself
- *     unavailable; FMV playback is skipped as if the video had finished.
+/** @file net_stub.c
+ *     PSP replacements for the networking (enet/curl/upnp) backends, which
+ *     are not built for the PSP. Networking reports itself unavailable.
  */
 /******************************************************************************/
 #include "pre_inc.h"
 #include <stdbool.h>
 #include "bflib_enet.h"
-#include "bflib_fmvids.h"
 #include "net_lan.h"
 #include "net_matchmaking.h"
 #include "net_portforward.h"
@@ -64,9 +62,3 @@ int matchmaking_poll_punch(PunchAddresses *output) { return -1; }
 /* ---- net_portforward ---- */
 int port_forward_add_mapping(uint16_t port) { return 0; }
 void port_forward_remove_mapping(void) {}
-
-/* ---- bflib_fmvids ---- */
-TbBool play_smk(const char * filename, int flags) { return true; }
-short anim_stop(void) { return 0; }
-short anim_record(void) { return 0; }
-TbBool anim_record_frame(unsigned char * screenbuf, unsigned char * palette) { return false; }
