@@ -33,7 +33,9 @@ extern "C" {
 #define MANUFACTURED_ITEMS_LIMIT 50
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 enum WorkshopCrateSource {
     WrkCrtS_None = 0,

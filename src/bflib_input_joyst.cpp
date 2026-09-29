@@ -187,6 +187,7 @@ void controller_rumble(long ms)
 
 void init_controller_input()
 {
+    PSP_TRACE("init_controller_input");
     if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) {
         ERRORLOG("SDL gamepad init: %s", SDL_GetError());
         return;

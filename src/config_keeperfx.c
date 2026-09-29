@@ -430,6 +430,7 @@ static void load_file_configuration(const char *fname, const char *sname, const 
       // Finding command number in this line
       int i = 0;
       int cmd_num = recognize_conf_command(buf, &pos, len, conf_commands);
+      PSP_TRACE("cfg line %d cmd %d", (int)text_line_number, cmd_num);
       // Now store the config item in correct place
       int k;
       char word_buf[128];

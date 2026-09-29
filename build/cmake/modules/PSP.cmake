@@ -11,7 +11,14 @@ kfx_status("PLATFORM" "Sony PSP (MIPS Allegrex, pspdev)")
 
 set(KFX_PSP_DEPS "${CMAKE_SOURCE_DIR}/deps/psp")
 
-add_compile_definitions("DEBUG=$<IF:$<CONFIG:Debug>,1,0>" _GNU_SOURCE KFX_PSP=1 KFX_NO_OPENGL=1 KFX_NO_NETWORK=1 KFX_FMV_SMACKER=1 KFX_LAZY_SOUND_BANKS=1 KFX_GAME_ON_HEAP=1)
+add_compile_definitions("DEBUG=$<IF:$<CONFIG:Debug>,1,0>" _GNU_SOURCE KFX_PSP=1 KFX_NO_OPENGL=1 KFX_NO_NETWORK=1 KFX_FMV_SMACKER=1 KFX_LAZY_SOUND_BANKS=1 KFX_GAME_ON_HEAP=1 KFX_NATURAL_ALIGNMENT=1)
+
+# KFX_NATURAL_ALIGNMENT: most engine structs are declared under #pragma pack(1)
+# to match the original game's memory layout. The PSP's CPU faults on
+# misaligned word/halfword accesses (PPSSPP doesn't emulate that), and code
+# takes plain int*/struct* pointers to such members, so on the PSP only
+# on-disk formats stay packed (map_columns.h and the file-local structs in
+# .c/.cpp files); saves and replays are PSP-only anyway.
 
 # ---- Sources ----
 file(GLOB_RECURSE KEEPERFX_SOURCES_C   CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
@@ -86,6 +93,10 @@ target_link_libraries(keeperfx PRIVATE
 target_link_options(keeperfx PRIVATE -Wl,-Map,keeperfx.map)
 
 option(KFX_PSP_MEMDEBUG "Log large heap allocations and allocation failures to stderr" OFF)
+option(KFX_PSP_TRACE "Trace startup steps to psp_trace.txt (for real hardware)" OFF)
+if(KFX_PSP_TRACE)
+    target_compile_definitions(keeperfx PRIVATE KFX_PSP_TRACE=1)
+endif()
 option(KFX_PSP_PERFLOG "Log presented frames per second to keeperfx.log" OFF)
 if(KFX_PSP_PERFLOG)
     target_compile_definitions(keeperfx PRIVATE KFX_PSP_PERFLOG=1)

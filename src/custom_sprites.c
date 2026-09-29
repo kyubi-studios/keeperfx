@@ -128,7 +128,8 @@ enum CustomLoadFlags {
 };
 
 #if defined(KFX_PSP)
-static unsigned char big_scratch_data[1024*1024*2] = {0};
+// Aligned: parts of it are reused as arrays of structs (see player_utils.c).
+static unsigned char big_scratch_data[1024*1024*2] __attribute__((aligned(16))) = {0};
 #else
 static unsigned char big_scratch_data[1024*1024*16] = {0};
 #endif

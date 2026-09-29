@@ -181,7 +181,12 @@ unsigned char const height_masks[] = {
 // View distance related
 struct MinMax minmaxs[MINMAX_LENGTH];
 unsigned char *getpoly;
+#if defined(KFX_NATURAL_ALIGNMENT)
+// Bucket structs are carved out of this byte pool; keep it aligned for them.
+unsigned char poly_pool[POLY_POOL_SIZE] __attribute__((aligned(16)));
+#else
 unsigned char poly_pool[POLY_POOL_SIZE];
+#endif
 unsigned char *poly_pool_end;
 struct BasicQ *buckets[BUCKETS_COUNT];
 long cells_away;

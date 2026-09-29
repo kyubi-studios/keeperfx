@@ -30,7 +30,9 @@ extern "C" {
 #define CREATURE_FALL_ACCELERATION 32
 #define CREATURE_TERMINAL_VELOCITY (MAX_VELOCITY - CREATURE_FALL_ACCELERATION)
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct Thing;
 struct Dungeon;

@@ -31,7 +31,9 @@ extern "C" {
 #define DELAUNAY_COUNT 1000
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 extern long tree_val[TREEVALS_COUNT];
 

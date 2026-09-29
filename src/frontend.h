@@ -42,7 +42,9 @@ extern "C" {
 // After that much milliseconds in main menu, demo is started
 #define MNU_DEMO_IDLE_TIME 30000
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 enum DemoItem_Kind {
     DIK_PlaySmkVideo,

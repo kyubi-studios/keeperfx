@@ -49,8 +49,13 @@ bool load_index_file(TbSpriteSheet & sheet, offset_list & offsets, const char * 
     offsets.reserve(num_sprites + 1);
     for (size_t i = 0; i < num_sprites; ++i) {
         const auto & entry = entries[i];
-        sheet.sprites.emplace_back(TbSprite{nullptr, entry.width, entry.height});
-        offsets.emplace_back(entry.offset, i);
+        // Copy out of the packed (6-byte) record first: binding a reference
+        // to entry.offset makes the callee do a misaligned 32-bit load.
+        const uint32_t offset = entry.offset;
+        const auto width = entry.width;
+        const auto height = entry.height;
+        sheet.sprites.emplace_back(TbSprite{nullptr, width, height});
+        offsets.emplace_back(offset, i);
     }
     return true;
 }

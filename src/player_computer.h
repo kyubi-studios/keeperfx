@@ -245,7 +245,9 @@ enum computer_process_func_list
 #define INVALID_COMPUTER_PROCESS NULL
 #define INVALID_COMPUTER_TASK &game.computer_task[0]
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct Computer2;
 struct ComputerProcess;

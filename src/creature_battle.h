@@ -30,7 +30,9 @@ extern "C" {
 #define BATTLES_COUNT          192
 #define MESSAGE_BATTLERS_COUNT   8
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct Thing;
 struct PlayerInfo;

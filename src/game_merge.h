@@ -117,7 +117,9 @@ enum GameFlags2 {
     GF2_PERSISTENT_FLAGS          = 0xFFFF0000
 };
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 /** Structure which stores state of scrollable message with text.
  */

@@ -33,7 +33,9 @@ extern "C" {
 #define SPRITE_SCALING_YSTEPS max(MAX_SUPPORTED_SPRITE_DIM,MAX_SUPPORTED_SCREEN_HEIGHT)
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 // TODO : I've moved bflib_vidraw.c to kfx/renderer/software, clean this up and split to files elsewhere.
 struct TiledSprite;

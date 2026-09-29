@@ -359,7 +359,8 @@ void make_safe(struct PlayerInfo *player)
     }
 
     PlayerNumber plyr_idx = player->id_number;
-    SlabCodedCoords* slblist = (SlabCodedCoords*)(big_scratch + game.map_tiles_x * game.map_tiles_y);
+    // Rounded up to keep the list aligned (the map size in slabs can be odd).
+    SlabCodedCoords* slblist = (SlabCodedCoords*)(big_scratch + ((game.map_tiles_x * game.map_tiles_y + 3) & ~3));
     unsigned int list_len = 0;
     unsigned int list_cur = 0;
     struct Room* room_list[ROOMS_COUNT + 1];

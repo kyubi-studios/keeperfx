@@ -198,7 +198,9 @@ enum KeyModifiers {
 #define KMod_DONTCARE -1
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 typedef uint16_t TbKeyCode;
 typedef short TbKeyMods;

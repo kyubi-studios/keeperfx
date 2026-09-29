@@ -51,7 +51,9 @@ extern "C" {
 #define MAX_SUPPORTED_SCREEN_HEIGHT 2160
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 /** Pixel definition - represents value of one point on the graphics screen. */
 typedef unsigned char TbPixel;

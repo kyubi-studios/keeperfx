@@ -29,7 +29,9 @@ extern "C" {
 #endif
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 extern struct TbSpriteSheet * frontstory_font;
 extern long credits_offset;

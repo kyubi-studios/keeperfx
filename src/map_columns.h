@@ -35,7 +35,13 @@ extern "C" {
 
 struct Map;
 
+#if defined(KFX_NATURAL_ALIGNMENT)
+/* Kept packed (it is the .CLM file record) but 4-aligned, so the
+ * unsigned short pointers taken into cubes[] (offset 8) stay aligned. */
+struct __attribute__((aligned(4))) Column { // sizeof=0x18
+#else
 struct Column { // sizeof=0x18
+#endif
     short use;
     unsigned char bitfields;
     unsigned short solidmask;

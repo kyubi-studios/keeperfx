@@ -33,7 +33,9 @@ extern "C" {
 /******************************************************************************/
 #define FRONTMAP_ZOOM_LENGTH 240
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct TbSprite;
 

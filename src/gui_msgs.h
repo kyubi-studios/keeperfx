@@ -42,7 +42,9 @@ enum MessageTypes {
     MsgType_Custom,
 };
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct GuiMessage_OLD { // sizeof = 0x45 (69)
     char text[64];

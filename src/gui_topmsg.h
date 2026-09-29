@@ -27,7 +27,9 @@ extern "C" {
 #endif
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 enum ErrorStatisticEntries {
     ESE_NoFreeThings = 0,

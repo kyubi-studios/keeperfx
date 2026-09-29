@@ -81,7 +81,9 @@ enum GUI_Menus {
 
 #define MENU_INVALID_ID -1
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct GuiMenu;
 struct GuiButton;

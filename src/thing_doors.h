@@ -28,7 +28,9 @@ extern "C" {
 /******************************************************************************/
 #define DOOR_TYPES_COUNT_OLD        5
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 enum DoorStates {
     DorSt_Unused = 0,

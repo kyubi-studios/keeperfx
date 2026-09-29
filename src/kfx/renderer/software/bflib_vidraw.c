@@ -37,6 +37,14 @@
 #include "bflib_render.h"
 #include "post_inc.h"
 
+/** Reads a 32-bit value from sprite data, which isn't necessarily aligned. */
+static inline uint32_t read_unaligned_u32(const unsigned char *p)
+{
+    uint32_t v;
+    memcpy(&v, p, sizeof(v));
+    return v;
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1334,31 +1342,11 @@ TbResult LbSpriteDrawOneColourImmediate(long x, long y, const struct TbSprite *s
 
 void LbPixelBlockCopyForward(TbPixel * dst, const TbPixel * src, long len)
 {
-    TbPixel px;
-    unsigned long pxquad;
-    if ( !((ptrdiff_t)dst & 3) || ((px = *src, ++src, *dst = px, ++dst, --len, len)
-     && (!((ptrdiff_t)dst & 3) || ((px = *src, ++src, *dst = px, ++dst, --len, len)
-     && (!((ptrdiff_t)dst & 3) ||  (px = *src, ++src, *dst = px, ++dst, --len, len))))) )
-    {
-        long l;
-        for ( l = len>>2; l > 0; l--)
-        {
-            pxquad = *(uint32_t *)src;
-            src += sizeof(uint32_t);
-            *(uint32_t *)dst = pxquad;
-            dst += sizeof(uint32_t);
-        }
-        if (len & 3)
-        {
-          *dst = *src;
-          if ((len & 3) != 1)
-          {
-            *(dst + 1) = *(src + 1);
-            if ((len & 3) != 2)
-              *(dst + 2) = *(src + 2);
-          }
-        }
-    }
+    // memmove instead of the old aligned-destination word loop: that loop
+    // read 32-bit words from a possibly unaligned source, which faults on
+    // CPUs without unaligned access (PSP).
+    if (len > 0)
+        memmove(dst, src, len);
 }
 
 /**
@@ -1679,7 +1667,7 @@ TbResult LbHugeSpriteDrawUsingScalingUpData(uchar *outbuf, int scanline, int out
             while (out_end - outbuf < scanline)
             {
                 int pxlen;
-                pxlen = *(uint32_t *)sprdata;
+                pxlen = read_unaligned_u32(sprdata);
                 sprdata += 4;
                 TbPixel *out_start;
                 out_start = out_end;
@@ -1715,7 +1703,7 @@ TbResult LbHugeSpriteDrawUsingScalingUpData(uchar *outbuf, int scanline, int out
                     }
                 }
                 // Transparent bytes count
-                pxlen = *(uint32_t *)sprdata;
+                pxlen = read_unaligned_u32(sprdata);
                 sprdata += 4;
                 out_end -= xcurstep[0];
                 xcurstep += 2 * pxlen;

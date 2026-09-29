@@ -119,7 +119,9 @@ enum TbConfigLoadFlags {
     CnfLd_PreListed     =  0x08, /**< Already parsed the names. */
 };
 
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 
 /******************************************************************************/

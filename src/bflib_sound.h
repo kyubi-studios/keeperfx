@@ -30,7 +30,9 @@ extern "C" {
 #define SOUNDS_MAX_COUNT  16
 #define SOUND_EMITTERS_MAX 128
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 // Type definitions
 

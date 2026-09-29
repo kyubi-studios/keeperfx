@@ -102,7 +102,9 @@ enum GameNumfieldDFlags {
     GNFldD_unusedparam80 = 0x80,
 };
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct CreaturePool {
   int32_t crtr_kind[CREATURE_TYPES_MAX];

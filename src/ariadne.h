@@ -35,7 +35,9 @@ extern "C" {
 #define ARID_PATH_WAYPOINTS_COUNT 1400
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct Thing;
 

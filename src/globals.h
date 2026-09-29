@@ -208,7 +208,9 @@ enum AnglesAndDegrees {
     DEGREES_360 = 2048,     // 360° - Full circle
 };
 
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 /** Screen coordinate in scale of the game (resolution independent). */
 typedef int32_t ScreenCoord;

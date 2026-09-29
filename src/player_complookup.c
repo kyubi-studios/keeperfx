@@ -235,7 +235,9 @@ void check_map_for_gold(void)
     }
     // Make a map with treasure areas marked
     unsigned char* treasure_map = (unsigned char*)big_scratch;
-    unsigned short* vein_list = (unsigned short*)&big_scratch[game.map_tiles_x * game.map_tiles_y];
+    // Round up: map_tiles_x * map_tiles_y is odd for 85x85 maps, and CPUs
+    // without unaligned access (PSP) fault on the unsigned short stores.
+    unsigned short* vein_list = (unsigned short*)&big_scratch[(game.map_tiles_x * game.map_tiles_y + 3) & ~3];
     for (slb_y = 0; slb_y < game.map_tiles_y; slb_y++)
     {
         for (slb_x = 0; slb_x < game.map_tiles_x; slb_x++)

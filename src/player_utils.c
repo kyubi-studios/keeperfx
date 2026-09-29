@@ -748,7 +748,10 @@ void fill_in_explored_area(PlayerNumber plyr_idx, MapSubtlCoord stl_x, MapSubtlC
             }
             else
             {
-                scratch_slab_ptr = &first_scratch[get_slab_number(exploration_direction_offsets[*(int *)i].x,exploration_direction_offsets[*(int *)i].y) + game.map_tiles_x * slb_y];
+                // Each table entry is {offset index, 0, 0, 0, mask}; the index used to be read
+                // as *(int *)i, a misaligned load (entries are 5 bytes apart).
+                const unsigned char dir_idx = (unsigned char)i[0];
+                scratch_slab_ptr = &first_scratch[get_slab_number(exploration_direction_offsets[dir_idx].x,exploration_direction_offsets[dir_idx].y) + game.map_tiles_x * slb_y];
                 scratch_slab_ptr[slb_x] |= 2u;
                 direction_flags &= i[4];
             }

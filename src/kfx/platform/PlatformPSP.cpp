@@ -16,6 +16,7 @@
 #include <psppower.h>
 #include <cstdio>
 #include <cstring>
+#include <cstdarg>
 #include "post_inc.h"
 
 /* Take all user memory for the newlib heap except 4 MB kept back for thread
@@ -36,8 +37,12 @@ const char* PlatformPSP::GetUserPrefDir()
 
 bool PlatformPSP::VideoInit()
 {
-    if (!SDL_Init(SDL_INIT_VIDEO))
+    PSP_TRACE("SDL_Init video");
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        PSP_TRACE("SDL_Init failed: %s", SDL_GetError());
         return false;
+    }
+    PSP_TRACE("SDL_Init ok");
     atexit(SDL_Quit);
     return true;
 }
@@ -67,6 +72,23 @@ static int append_args_file(int argc, char **argv, char **out, int max_args)
 
 #if defined(KFX_GAME_ON_HEAP)
 #include "game_legacy.h" // kfx_game_ptr
+#endif
+
+#if defined(KFX_PSP_TRACE)
+/* Startup tracing for real hardware: each line is written and the file
+ * closed immediately, so the last step survives a hang or crash. */
+extern "C" void psp_trace(const char* fmt, ...)
+{
+    FILE* f = fopen("psp_trace.txt", "a");
+    if (f == NULL)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(f, fmt, ap);
+    va_end(ap);
+    fputc('\n', f);
+    fclose(f);
+}
 #endif
 
 // Written before anything else, so there is a trace even if the game dies

@@ -2060,11 +2060,13 @@ static short resolve_startup_config(void)
     features_enabled |= Ft_DeltaTime; // enable delta time
     features_enabled |= Ft_NoCdMusic; // use music files (OGG) rather than CD music
     features_enabled &= ~Ft_ParchmentFade; // do not fade into and out of the parchment map
+    PSP_TRACE("load_configuration start");
     if (!load_configuration())
     {
         ERRORLOG("Configuration load error.");
         return 0;
     }
+    PSP_TRACE("load_configuration done");
 
 #ifdef FUNCTESTING
     start_params.startup_flags &= ~SFlg_Legal;
@@ -2122,15 +2124,19 @@ int LbBullfrogMain(unsigned short argc, char *argv[])
         return 0;
     }
 
+    PSP_TRACE("startup config resolved");
     LbIKeyboardOpen();
+    PSP_TRACE("keyboard open");
     if (LbDataLoadAll(legal_load_files) != 0)
     {
         ERRORLOG("Error on allocation/loading of legal_load_files.");
         LbErrorLogClose();
         return 0;
     }
+    PSP_TRACE("legal files loaded");
     // Setup polyscans
     setup_bflib_render();
+    PSP_TRACE("bflib render set up");
     // View the legal screen
     if (!setup_screen_mode_zero(get_frontend_vidmode()))
     {
@@ -2139,7 +2145,9 @@ int LbBullfrogMain(unsigned short argc, char *argv[])
         return 0;
     }
 
+    PSP_TRACE("screen mode zero set");
     retval &= (RendererInit((RendererType)requested_renderer_type) != 0);
+    PSP_TRACE("renderer init %d", (int)retval);
     RendererSettings_Load();
     PlatformManager_SetWindowTitle(PROGRAM_NAME);
     LbSetIcon(1);

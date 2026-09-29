@@ -56,7 +56,9 @@ extern "C" {
 
 #define INVALID_CRTR_CONTROL (&game.cctrl_data[0])
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct Thing;
 struct PlayerInfo;

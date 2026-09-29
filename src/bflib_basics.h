@@ -68,7 +68,9 @@ enum TbErrorCode {
 };
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 // These types should be deprecated because we have stdint.h now.
 typedef unsigned long ulong;

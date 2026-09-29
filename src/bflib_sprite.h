@@ -28,7 +28,9 @@
 extern "C" {
 #endif
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 /**
  * Type which contains buffer of a sprite, with RLE-encoded alpha channel.

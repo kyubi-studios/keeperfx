@@ -3,6 +3,7 @@
 #define KFX_PSP_COMPAT_H
 
 #include <strings.h>
+#include "psp_trace.h"
 #include <signal.h>
 
 #ifndef stricmp

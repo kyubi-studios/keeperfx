@@ -58,3 +58,4 @@ debug.log
 /CMakeUserPresets.json
 /out-psp/
 /out-psp-dbg/
+/out-psp-trace/

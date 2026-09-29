@@ -459,7 +459,9 @@ bool WindowSystemSDL::CreateWindow(const char* title, int x, int y, int w, int h
 #endif
     }
 
+    PSP_TRACE("SDL_CreateWindow %dx%d", w, h);
     m_window = SDL_CreateWindow(title, w, h, sdl3_flags);
+    PSP_TRACE("SDL_CreateWindow -> %p %s", (void*)m_window, m_window ? "" : SDL_GetError());
     if (!m_window)
         return false;
     m_keepComposited = (flags & KFX_WF_KEEP_COMPOSITED) != 0;

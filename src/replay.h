@@ -29,7 +29,9 @@ extern "C" {
 /******************************************************************************/
 struct CatalogueEntry;
 
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 // save file header for .pck files.
 // (Bump the version if this struct or the .pck format changes.)

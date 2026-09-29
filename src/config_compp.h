@@ -28,7 +28,9 @@
 extern "C" {
 #endif
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 #define COMPUTER_TASKS_COUNT        100
 #define COMPUTER_PROCESSES_COUNT     20

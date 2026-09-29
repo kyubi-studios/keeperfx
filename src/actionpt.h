@@ -30,7 +30,9 @@ extern "C" {
 #define HERO_GATES_COUNT      256
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct InitActionPoint {
     struct Coord2d mappos;

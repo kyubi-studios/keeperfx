@@ -28,7 +28,9 @@ extern "C" {
 
 #define TORTURE_DOORS_COUNT 9
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct DoorSoundState { // sizeof = 8
   long current_volume;

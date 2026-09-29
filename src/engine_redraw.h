@@ -28,7 +28,9 @@
 extern "C" {
 #endif
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct PlayerInfo;
 

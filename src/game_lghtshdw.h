@@ -33,7 +33,9 @@ extern "C" {
 #define SHADOW_CACHE_COUNT    512
 
 /******************************************************************************/
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct LightingTable { // sizeof = 8
   TbBool is_populated;

@@ -60,7 +60,9 @@ bool RendererSoftware::ensure_present_target()
         destroy_present_target();
     if (m_renderer == nullptr)
     {
+        PSP_TRACE("SDL_CreateRenderer");
         m_renderer = SDL_CreateRenderer(window, NULL);
+        PSP_TRACE("SDL_CreateRenderer -> %p", (void*)m_renderer);
         if (m_renderer == nullptr)
         {
             ERRORLOG("SDL_CreateRenderer failed: %s", SDL_GetError());

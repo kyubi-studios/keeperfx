@@ -29,7 +29,9 @@ extern "C" {
 /******************************************************************************/
 #define frontend_services_menu_items_visible  6
 
+#if !defined(KFX_NATURAL_ALIGNMENT) // PSP: see PSP.cmake
 #pragma pack(1)
+#endif
 
 struct GuiMenu;
 struct GuiButton;
