@@ -408,7 +408,15 @@ struct Game {
 
 #pragma pack()
 /******************************************************************************/
+#if defined(KFX_GAME_ON_HEAP)
+/* The Game struct (~14 MB on the PSP) is allocated at startup instead of
+ * living in .bss, so the EBOOT's module image fits the 24 MB the PSP loader
+ * can place before extended memory is enabled. Same syntax either way. */
+extern struct Game *kfx_game_ptr;
+#define game (*kfx_game_ptr)
+#else
 extern struct Game game;
+#endif
 extern int32_t turns_per_second;
 
 extern int32_t fps_limit_current;

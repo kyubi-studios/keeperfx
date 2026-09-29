@@ -27,7 +27,19 @@
 extern "C" {
 #endif
 /******************************************************************************/
+#if defined(KFX_GAME_ON_HEAP)
+struct Game *kfx_game_ptr = NULL;
+
+/* Runs before main() and C++ static constructors, so nothing sees it unset. */
+__attribute__((constructor(101))) static void kfx_allocate_game(void)
+{
+    kfx_game_ptr = (struct Game *)calloc(1, sizeof(struct Game));
+    if (kfx_game_ptr == NULL)
+        abort();
+}
+#else
 struct Game game;
+#endif
 
 GameTurn get_gameturn()
 {
