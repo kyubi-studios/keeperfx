@@ -40,6 +40,21 @@ rsync -a "$SRC/campgns/" "$OUT/campgns/"
 rsync -a "$SRC/levels/" "$OUT/levels/"
 rsync -a "$SRC/pkg/" "$OUT/"
 
+# The release and the source tree name a few files with different case
+# (MAP00001.TXT vs map00001.txt); the PSP's FAT filesystem can only hold one.
+# Keep the copy that exists in the source tree.
+src_path_of() {
+    case "$1" in
+        fxdata/*|creatrs/*) echo "$SRC/config/$1" ;;
+        *) echo "$SRC/$1" ;;
+    esac
+}
+(cd "$OUT" && find . -type f | sed 's|^\./||') \
+    | awk '{ k = tolower($0); if (k in seen) { print seen[k]; print $0 } else seen[k] = $0 }' \
+    | sort -u | while read -r f; do
+        [ -e "$(src_path_of "$f")" ] || rm -f "$OUT/$f"
+    done
+
 # Copy one DK folder into a lowercase destination, never overwriting.
 copy_dk_dir() {
     src=$1
