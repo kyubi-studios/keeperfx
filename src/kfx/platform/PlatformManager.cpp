@@ -12,6 +12,7 @@
 #include "kfx/platform/IPlatform.h"
 #include "kfx/platform/PlatformWindows.h"
 #include "kfx/platform/PlatformLinux.h"
+#include "kfx/platform/PlatformPSP.h"
 #include "kfx/platform/FileFind.h"
 #include "platform.h"
 #include "bflib_fileio.h"
@@ -27,6 +28,8 @@ IPlatform* GetPlatform()
 {
 #if defined(_WIN32)
     static PlatformWindows s_platform;
+#elif defined(KFX_PSP)
+    static PlatformPSP s_platform;
 #else
     static PlatformLinux s_platform;
 #endif

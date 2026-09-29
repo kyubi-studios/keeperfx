@@ -6161,7 +6161,7 @@ void check_for_creature_escape_from_lava(struct Thing *thing)
  */
 ThingModel get_footstep_effect_element(struct Thing* thing)
 {
-    static const unsigned char tileset_footstep_textures[TEXTURE_VARIATIONS_COUNT] =
+    static const unsigned char tileset_footstep_textures[32] =
     { TngEffElm_None,       TngEffElm_None,         TngEffElm_IceMelt3,     TngEffElm_None,
       TngEffElm_None,       TngEffElm_None,         TngEffElm_None,         TngEffElm_None,
       TngEffElm_StepSand,   TngEffElm_StepGypsum,   TngEffElm_None,         TngEffElm_None,

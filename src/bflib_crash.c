@@ -26,7 +26,7 @@
 #include "bflib_crash.h"
 #include <signal.h>
 #include <stdarg.h>
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(KFX_PSP)
 #define BF_POSIX_CRASH 1
 #endif
 #if defined(_WIN32)

@@ -9,7 +9,9 @@
 #include "pre_inc.h"
 #include "kfx/platform/WindowSystemSDL.h"
 #include "kfx/platform/IPlatform.h"
+#if !defined(KFX_NO_OPENGL)
 #include "kfx/platform/GLContextSDL.h"
+#endif
 #include "bflib_basics.h"
 #include "bflib_video.h"
 #include <SDL3/SDL.h>
@@ -452,7 +454,9 @@ bool WindowSystemSDL::CreateWindow(const char* title, int x, int y, int w, int h
         // GL context is fully created and current -- matches develop's
         // platform_create_gl_context() sequencing.
         sdl3_flags |= SDL_WINDOW_HIDDEN;
+#if !defined(KFX_NO_OPENGL)
         GLContextSDL::RequestWindowAttributes();
+#endif
     }
 
     m_window = SDL_CreateWindow(title, w, h, sdl3_flags);
@@ -480,7 +484,11 @@ void WindowSystemSDL::ShowWindow()
 
 std::unique_ptr<IGLContext> WindowSystemSDL::CreateGLContext()
 {
+#if defined(KFX_NO_OPENGL)
+    return nullptr;
+#else
     return GLContextSDL::Create(m_window);
+#endif
 }
 
 bool WindowSystemSDL::SetWindowTitle(const char* title)

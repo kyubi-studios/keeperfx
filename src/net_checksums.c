@@ -39,7 +39,11 @@ extern "C" {
 
 /******************************************************************************/
 #define CHECKSUM_ADD(checksum, value) checksum = ((checksum << 5) | (checksum >> 27)) ^ (ulong)(value)
+#if defined(KFX_NO_NETWORK)
+#define SNAPSHOT_BUFFER_SIZE 1
+#else
 #define SNAPSHOT_BUFFER_SIZE 15
+#endif
 
 struct ChecksumSnapshot {
     GameTurn turn;

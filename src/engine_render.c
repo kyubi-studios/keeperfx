@@ -3942,7 +3942,10 @@ unsigned short engine_remap_texture_blocks(long stl_x, long stl_y, unsigned shor
     texture_scroll = (struct Coord2d){0};
     long slb_x = subtile_slab(stl_x);
     long slb_y = subtile_slab(stl_y);
-    return tex_id + (game.slab_ext_data[get_slab_number(slb_x,slb_y)] & 0x1F) * TEXTURE_BLOCKS_COUNT;
+    unsigned char variation = game.slab_ext_data[get_slab_number(slb_x,slb_y)] & 0x1F;
+    if (variation >= TEXTURE_VARIATIONS_COUNT)
+        variation = 0; // tileset not loaded on this build (PSP)
+    return tex_id + variation * TEXTURE_BLOCKS_COUNT;
 }
 
 static int32_t get_abyss_liquid_scroll(const struct CubeConfigStats *texturing)

@@ -15,6 +15,10 @@
 #include <cstdlib>
 
 // Single-header MP3 decoder (no external DLL dependency)
+#if defined(KFX_PSP)
+// pspdev's SDL3_mixer embeds dr_mp3 with external linkage too; keep ours private.
+#define DRMP3_API static
+#endif
 #define DR_MP3_IMPLEMENTATION
 #include "../deps/dr_mp3.h"
 #include <memory>

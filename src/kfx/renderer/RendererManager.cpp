@@ -2,7 +2,9 @@
 #include "kfx/renderer/RendererManager.h"
 #include "kfx/renderer/RendererManager_Internal.h"
 #include "kfx/renderer/RendererSoftware.h"
+#if !defined(KFX_NO_OPENGL)
 #include "kfx/renderer/RendererOpenGL.h"
+#endif
 #include "bflib_basics.h"
 #include "bflib_video.h"
 #include "kfx/renderer/ITextRenderer.h"
@@ -30,7 +32,9 @@ static IRenderer* create_renderer(RendererType type)
     switch (type)
     {
         case RENDERER_SOFTWARE: return new RendererSoftware();
+#if !defined(KFX_NO_OPENGL)
         case RENDERER_OPENGL:   return new RendererOpenGL();
+#endif
         default:                return nullptr;
     }
 }

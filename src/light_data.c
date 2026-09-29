@@ -2095,7 +2095,7 @@ static char light_render_light(struct Light* lgt)
         lighting_tables_idx = shdc->lighting_bitmask[cache_y];
         if ( y_end >= y_start )
         {
-          uint32_t * shadow_cache_pointer = &shdc->lighting_bitmask[cache_y];
+          unsigned int * shadow_cache_pointer = &shdc->lighting_bitmask[cache_y];
           MapCoord y = y_start;
           do
           {

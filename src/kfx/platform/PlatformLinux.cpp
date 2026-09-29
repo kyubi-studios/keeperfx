@@ -116,7 +116,9 @@ void PlatformLinux::ShutdownSteam() {}
 /******************************************************************************/
 // Process entry point.
 
+#if !defined(KFX_PSP) // PlatformPSP.cpp owns the PSP entry point
 extern "C" int main(int argc, char *argv[])
 {
     return kfxmain(argc, argv);
 }
+#endif

@@ -1,0 +1,47 @@
+/******************************************************************************/
+// Bullfrog Engine Emulation Library - for use to remake classic games like
+// Syndicate Wars, Magic Carpet or Dungeon Keeper.
+/******************************************************************************/
+/** @file PlatformPSP.cpp
+ *     Sony PSP platform services and process entry point.
+ */
+/******************************************************************************/
+#include "pre_inc.h"
+#include "kfx/platform/PlatformPSP.h"
+#include "platform.h" // kfxmain
+#include "config.h"   // keeper_runtime_directory
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
+#include <pspkernel.h>
+#include <cstdio>
+#include "post_inc.h"
+
+/* Take all user memory for the newlib heap, keeping 2 MB back for thread
+ * stacks and SDL/audio kernel allocations. */
+PSP_HEAP_SIZE_KB(-2048);
+PSP_MAIN_THREAD_STACK_SIZE_KB(1024);
+
+const char* PlatformPSP::GetOSVersion() const { return "PSP"; }
+
+const char* PlatformPSP::GetUserPrefDir()
+{
+    // Settings live next to the EBOOT, like keeperfx.cfg.
+    return keeper_runtime_directory;
+}
+
+bool PlatformPSP::VideoInit()
+{
+    if (!SDL_Init(SDL_INIT_VIDEO))
+        return false;
+    atexit(SDL_Quit);
+    return true;
+}
+
+/******************************************************************************/
+// Process entry point; SDL_main.h wraps it with SDL's PSP startup (module
+// info, exit callback thread, GPU init).
+
+int main(int argc, char *argv[])
+{
+    return kfxmain(argc, argv);
+}

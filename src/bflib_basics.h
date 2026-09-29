@@ -42,7 +42,11 @@ extern "C" {
 // Smaller buffer, also widely used
 #define TEXT_BUFFER_LENGTH 2048
 
+#if defined(KFX_PSP)
+#define MAX_CONSOLE_LOG_COUNT 64
+#else
 #define MAX_CONSOLE_LOG_COUNT 1000   // Maximum number of log messages
+#endif
 
 enum TbErrorLogFlags {
         Lb_ERROR_LOG_APPEND = 0,

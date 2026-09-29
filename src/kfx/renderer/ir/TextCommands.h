@@ -37,8 +37,8 @@ struct IRTextDrawCmd
     unsigned char draw_colour = 0;
     uint32_t draw_flags   = 0;
 
-    int32_t  justify_x = 0, justify_y = 0, justify_w = 0;
-    int32_t  clip_x = 0, clip_y = 0, clip_w = 0, clip_h = 0;
+    int      justify_x = 0, justify_y = 0, justify_w = 0;
+    int      clip_x = 0, clip_y = 0, clip_w = 0, clip_h = 0;
 
     const void* font = nullptr; // TbSpriteSheet*, opaque here
     uint32_t    font_generation = 0;

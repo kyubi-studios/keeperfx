@@ -127,7 +127,11 @@ enum CustomLoadFlags {
     CLF_Ensigns = 0x10
 };
 
+#if defined(KFX_PSP)
+static unsigned char big_scratch_data[1024*1024*2] = {0};
+#else
 static unsigned char big_scratch_data[1024*1024*16] = {0};
+#endif
 unsigned char *big_scratch = big_scratch_data;
 
 static void compress_raw(struct TbHugeSprite *sprite, unsigned char *src_buf, int x, int y, int w, int h, const uint8_t *conversion_table);

@@ -28,7 +28,12 @@ extern "C" {
 #endif
 /******************************************************************************/
 // Num of known texture files
+#if defined(KFX_PSP)
+// PSP: only the level's own tileset (each variation costs ~1 MB).
+#define TEXTURE_VARIATIONS_COUNT      1
+#else
 #define TEXTURE_VARIATIONS_COUNT      32
+#endif
 
 // Static textures in tmapa
 #define TEXTURE_BLOCKS_STAT_COUNT_A   544

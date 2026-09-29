@@ -22,7 +22,11 @@
 #include "bflib_basics.h"
 #include "globals.h"
 
+#if defined(KFX_PSP)
+#define TRIANLGLES_COUNT 16000
+#else
 #define TRIANLGLES_COUNT 100000
+#endif
 
 #ifdef __cplusplus
 extern "C" {

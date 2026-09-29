@@ -38,6 +38,10 @@ configure_file(${CMAKE_SOURCE_DIR}/ver_defs.h.in ${CMAKE_SOURCE_DIR}/src/ver_def
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/build/cmake/modules)
 include(Helpers)
+if(PSP)
+    include(PSP)
+    return()
+endif()
 include(Platforms)
 include(Dependencies)
 include(BuildTargets)

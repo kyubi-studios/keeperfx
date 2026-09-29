@@ -23,7 +23,11 @@
 #include "bflib_basics.h"
 
 /** Max amount of creatures supported on any map. */
+#if defined(KFX_PSP)
+#define CREATURES_COUNT       256
+#else
 #define CREATURES_COUNT       1024
+#endif
 
 
 #ifdef __cplusplus
