@@ -302,6 +302,17 @@ void update_controller_inputs()
         lbKeyOn[KC_ESCAPE] = pause_menu_pressed;
     }
     last_pause_menu_state = pause_menu_pressed;
+
+#if defined(KFX_PSP)
+    // The "back" button (right click) also acts as Escape in the frontend
+    // menus, which mostly go back on Escape rather than on right click.
+    static TbBool last_back_state = false;
+    const TbBool back_pressed = (controller_button_state & get_game_key_controller_buttons(Gkey_RightClick)) != 0;
+    if (back_pressed && !last_back_state && (frontend_menu_state != FeSt_INITIAL)) {
+        lbKeyOn[KC_ESCAPE] = 1;
+    }
+    last_back_state = back_pressed;
+#endif
         
 }
 

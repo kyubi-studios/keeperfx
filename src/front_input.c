@@ -100,7 +100,10 @@ struct GuiLayer gui_layer = {GuiLayer_Default};
 
 #if defined(KFX_PSP)
 // PSP has one analog nub and no triggers: the nub drives the cursor, the
-// D-pad scrolls the map, R/L are left/right click, Select opens the map.
+// D-pad scrolls the map, Cross selects (left click), Triangle goes back
+// (right click; also Escape in the frontend menus), Circle/Square zoom in/out,
+// L/R rotate the camera (or switch instances when possessing), Start opens
+// the menu and Select the map. No button is a modifier.
 #define PSPBTN(desktop, psp) (psp)
 #else
 #define PSPBTN(desktop, psp) (desktop)
@@ -125,19 +128,19 @@ const struct GamekeySettings game_key_settings[GAME_KEYS_COUNT] = {
     {"MoveDown",              GUIStr_CtrlDown,                KC_S, KMod_NONE,               PSPBTN(CBtn_LS_DOWN, CBtn_DPAD_DOWN),             BMV_Visible,        },       // Gkey_MoveDown
     {"MoveLeft",              GUIStr_CtrlLeft,                KC_A, KMod_NONE,               PSPBTN(CBtn_LS_LEFT, CBtn_DPAD_LEFT),             BMV_Visible,        },       // Gkey_MoveLeft
     {"MoveRight",             GUIStr_CtrlRight,               KC_D, KMod_NONE,               PSPBTN(CBtn_LS_RIGHT, CBtn_DPAD_RIGHT),            BMV_Visible,        },       // Gkey_MoveRight
-    {"RotateMod",             GUIStr_CtrlRotate,              KC_LCONTROL, KMod_NONE,        CBtn_B,                   BMV_Visible,        },       // Gkey_RotateMod
-    {"SpeedMod",              GUIStr_CtrlSpeed,               KC_LSHIFT, KMod_NONE,          CBtn_A,                   BMV_Visible,        },       // Gkey_SpeedMod
-    {"RotateCW",              GUIStr_CtrlRotateLeft,          KC_DELETE, KMod_NONE,          CBtn_A|CBtn_DPAD_LEFT,    BMV_Visible,        },       // Gkey_RotateCW
-    {"RotateCCW",             GUIStr_CtrlRotateRight,         KC_PGDOWN, KMod_NONE,          CBtn_A|CBtn_DPAD_RIGHT,   BMV_Visible,        },       // Gkey_RotateCCW
-    {"ZoomIn",                GUIStr_CtrlZoomIn,              KC_HOME, KMod_NONE,            CBtn_A|CBtn_DPAD_UP,      BMV_Visible,        },       // Gkey_ZoomIn
-    {"ZoomOut",               GUIStr_CtrlZoomOut,             KC_END, KMod_NONE,             CBtn_A|CBtn_DPAD_DOWN,    BMV_Visible,        },       // Gkey_ZoomOut
+    {"RotateMod",             GUIStr_CtrlRotate,              KC_LCONTROL, KMod_NONE,        PSPBTN(CBtn_B, CBtn_NONE),                   BMV_Visible,        },       // Gkey_RotateMod
+    {"SpeedMod",              GUIStr_CtrlSpeed,               KC_LSHIFT, KMod_NONE,          PSPBTN(CBtn_A, CBtn_NONE),                   BMV_Visible,        },       // Gkey_SpeedMod
+    {"RotateCW",              GUIStr_CtrlRotateLeft,          KC_DELETE, KMod_NONE,          PSPBTN(CBtn_A|CBtn_DPAD_LEFT, CBtn_LEFTSHOULDER),    BMV_Visible,        },       // Gkey_RotateCW
+    {"RotateCCW",             GUIStr_CtrlRotateRight,         KC_PGDOWN, KMod_NONE,          PSPBTN(CBtn_A|CBtn_DPAD_RIGHT, CBtn_RIGHTSHOULDER),   BMV_Visible,        },       // Gkey_RotateCCW
+    {"ZoomIn",                GUIStr_CtrlZoomIn,              KC_HOME, KMod_NONE,            PSPBTN(CBtn_A|CBtn_DPAD_UP, CBtn_B),      BMV_Visible,        },       // Gkey_ZoomIn
+    {"ZoomOut",               GUIStr_CtrlZoomOut,             KC_END, KMod_NONE,             PSPBTN(CBtn_A|CBtn_DPAD_DOWN, CBtn_X),    BMV_Visible,        },       // Gkey_ZoomOut
     {"ZoomRoomTreasure",      CpgStr_RoomKind1+0,             KC_T, KMod_NONE,               CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomTreasure
     {"ZoomRoomLibrary",       CpgStr_RoomKind1+1,             KC_L, KMod_NONE,               CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomLibrary
     {"ZoomRoomLair",          CpgStr_RoomKind1+2,             KC_L, KMod_SHIFT,              CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomLair
     {"ZoomRoomPrison",        CpgStr_RoomKind1+3,             KC_P, KMod_SHIFT,              CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomPrison
     {"ZoomRoomTorture",       CpgStr_RoomKind1+4,             KC_T, KMod_ALT,                CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomTorture
     {"ZoomRoomTraining",      CpgStr_RoomKind1+5,             KC_T, KMod_SHIFT,              CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomTraining
-    {"ZoomRoomHeart",         CpgStr_RoomKind1+6,             KC_H, KMod_NONE,               CBtn_Y,                   BMV_Visible,        },       // Gkey_ZoomRoomHeart
+    {"ZoomRoomHeart",         CpgStr_RoomKind1+6,             KC_H, KMod_NONE,               PSPBTN(CBtn_Y, CBtn_NONE),                   BMV_Visible,        },       // Gkey_ZoomRoomHeart
     {"ZoomRoomWorkshop",      CpgStr_RoomKind1+7,             KC_W, KMod_ALT,                CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomWorkshop
     {"ZoomRoomScavenger",     CpgStr_RoomKind1+8,             KC_S, KMod_ALT,                CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomScavenger
     {"ZoomRoomTemple",        CpgStr_RoomKind1+9,             KC_T, KMod_CONTROL,            CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomTemple
@@ -147,17 +150,17 @@ const struct GamekeySettings game_key_settings[GAME_KEYS_COUNT] = {
     {"ZoomRoomGuardPost",     CpgStr_RoomKind1+13,            KC_G, KMod_SHIFT,              CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomGuardPost
     {"ZoomRoomBridge",        CpgStr_RoomKind1+14,            KC_B, KMod_SHIFT,              CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomBridge
     {"ZoomRoomPortal",        CpgStr_RoomKind2,               KC_P, KMod_CONTROL,            CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomRoomPortal
-    {"ZoomToFight",           GUIStr_StateFight,              KC_F, KMod_NONE,               CBtn_X,                   BMV_Visible,        },       // Gkey_ZoomToFight
+    {"ZoomToFight",           GUIStr_StateFight,              KC_F, KMod_NONE,               PSPBTN(CBtn_X, CBtn_NONE),                   BMV_Visible,        },       // Gkey_ZoomToFight
     {"ZoomCrAnnoyed",         GUIStr_StateAnnoyed,            KC_A, KMod_ALT,                CBtn_NONE,                BMV_Visible,        },       // Gkey_ZoomCrAnnoyed
-    {"CrtrContrlMod",         CpgStr_PowerKind1,              KC_LSHIFT, KMod_NONE,          CBtn_A,                   BMV_Visible,        },       // Gkey_CrtrContrlMod
+    {"CrtrContrlMod",         CpgStr_PowerKind1,              KC_LSHIFT, KMod_NONE,          PSPBTN(CBtn_A, CBtn_NONE),                   BMV_Visible,        },       // Gkey_CrtrContrlMod
     {"CrtrQueryMod",          GUIStr_Query,                   KC_Q, KMod_NONE,               CBtn_NONE,                BMV_Visible,        },       // Gkey_CrtrQueryMod
     {"DumpToOldPos",          GUIStr_UndoPickup,              KC_BACK, KMod_NONE,            CBtn_NONE,                BMV_Visible,        },       // Gkey_DumpToOldPos
     {"TogglePause",           GUIStr_Pause,                   KC_P, KMod_NONE,               CBtn_NONE,                BMV_Visible,        },       // Gkey_TogglePause
     {"SwitchToMap",           GUIStr_Map,                     KC_M, KMod_NONE,               PSPBTN(CBtn_LEFTSTICK, CBtn_BACK),           BMV_Visible,        },       // Gkey_SwitchToMap
     {"ToggleMessage",         GUIStr_ToggleMessage,           KC_E, KMod_NONE,               CBtn_NONE,                BMV_Visible,        },       // Gkey_ToggleMessage
     {"SnapCamera",            GUIStr_SnapCamera,              KC_MOUSE3, KMod_NONE,          CBtn_NONE,                BMV_Visible,        },       // Gkey_SnapCamera
-    {"BestRoomSpace",         GUIStr_BestRoomSpace,           KC_LSHIFT, KMod_NONE,          CBtn_A,                   BMV_Visible,        },       // Gkey_BestRoomSpace
-    {"SquareRoomSpace",       GUIStr_SquareRoomSpace,         KC_LCONTROL, KMod_NONE,        CBtn_B,                   BMV_Visible,        },       // Gkey_SquareRoomSpace
+    {"BestRoomSpace",         GUIStr_BestRoomSpace,           KC_LSHIFT, KMod_NONE,          PSPBTN(CBtn_A, CBtn_NONE),                   BMV_Visible,        },       // Gkey_BestRoomSpace
+    {"SquareRoomSpace",       GUIStr_SquareRoomSpace,         KC_LCONTROL, KMod_NONE,        PSPBTN(CBtn_B, CBtn_NONE),                   BMV_Visible,        },       // Gkey_SquareRoomSpace
     {"RoomSpaceIncSize",      GUIStr_RoomSpaceIncrease,       KC_MOUSEWHEEL_DOWN, KMod_NONE, CBtn_NONE,                BMV_Visible,        },       // Gkey_RoomSpaceIncSize
     {"RoomSpaceDecSize",      GUIStr_RoomSpaceDecrease,       KC_MOUSEWHEEL_UP, KMod_NONE,   CBtn_NONE,                BMV_Visible,        },       // Gkey_RoomSpaceDecSize
     {"SellTrapOnSubtile",     GUIStr_SellTrapOnSubtile,       KC_LALT, KMod_NONE,            CBtn_NONE,                BMV_Visible,        },       // Gkey_SellTrapOnSubtile
@@ -189,15 +192,15 @@ const struct GamekeySettings game_key_settings[GAME_KEYS_COUNT] = {
     {"LVNextLevel",           GUIStr_MnuUnused,               KC_F10, KMod_CONTROL,          CBtn_NONE,                BMV_Hidden,         },       // Gkey_LVNextLevel,
     {"LVPrevLevel",           GUIStr_MnuUnused,               KC_F9,  KMod_CONTROL,          CBtn_NONE,                BMV_Hidden,         },       // Gkey_LVPrevLevel,
     //TODO these are currently fixed, as controllers can't be reconfigured yet
-    {"NextInstance",          GUIStr_NextInstance,            KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_RIGHTSHOULDER, CBtn_Y),       BMV_ControllerOnly, },       // Gkey_NextInstance,
-    {"PrevInstance",          GUIStr_PrevInstance,            KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_LEFTSHOULDER, CBtn_X),        BMV_ControllerOnly, },       // Gkey_PrevInstance,
+    {"NextInstance",          GUIStr_NextInstance,            KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_RIGHTSHOULDER, CBtn_RIGHTSHOULDER),       BMV_ControllerOnly, },       // Gkey_NextInstance,
+    {"PrevInstance",          GUIStr_PrevInstance,            KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_LEFTSHOULDER, CBtn_LEFTSHOULDER),        BMV_ControllerOnly, },       // Gkey_PrevInstance,
     {"ButtonSnapLeft",        GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_DPAD_LEFT, CBtn_NONE),           BMV_ControllerOnly, },       // Gkey_ButtonSnapLeft,
     {"ButtonSnapRight",       GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_DPAD_RIGHT, CBtn_NONE),          BMV_ControllerOnly, },       // Gkey_ButtonSnapRight,
     {"ButtonSnapUp",          GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_DPAD_UP, CBtn_NONE),             BMV_ControllerOnly, },       // Gkey_ButtonSnapUp,
     {"ButtonSnapDown",        GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_DPAD_DOWN, CBtn_NONE),           BMV_ControllerOnly, },       // Gkey_ButtonSnapDown,
     {"PauseMenu",             GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      CBtn_START,               BMV_ControllerOnly, },       // Gkey_PauseMenu,
-    {"LeftClick",             GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_R2, CBtn_RIGHTSHOULDER),                  BMV_ControllerOnly, },       // Gkey_LeftClick,
-    {"RightClick",            GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_L2, CBtn_LEFTSHOULDER),                  BMV_ControllerOnly, },       // Gkey_RightClick,
+    {"LeftClick",             GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_R2, CBtn_A),                  BMV_ControllerOnly, },       // Gkey_LeftClick,
+    {"RightClick",            GUIStr_Keeper,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_L2, CBtn_Y),                  BMV_ControllerOnly, },       // Gkey_RightClick,
     {"MouseUp",               GUIStr_CtrlUp,                  KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_RS_UP, CBtn_LS_UP),               BMV_ControllerOnly, },       // Gkey_MouseUp
     {"MouseDown",             GUIStr_CtrlDown,                KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_RS_DOWN, CBtn_LS_DOWN),             BMV_ControllerOnly, },       // Gkey_MouseDown
     {"MouseLeft",             GUIStr_CtrlLeft,                KC_UNASSIGNED, KMod_NONE,      PSPBTN(CBtn_RS_LEFT, CBtn_LS_LEFT),             BMV_ControllerOnly, },       // Gkey_MouseLeft
@@ -398,7 +401,13 @@ int is_game_key_pressed(long key_id, TbBool clear_pressed, TbBool ignore_mods)
         return 0;
 
         
+#if defined(KFX_PSP)
+    // Each PSP binding is a single button, so none acts as a modifier; holding
+    // Cross to drag-tag must not block scrolling with the D-pad.
+    const TbControllerButtons mod_buttons = 0;
+#else
     const TbControllerButtons mod_buttons = CBtn_A|CBtn_B|CBtn_X|CBtn_Y;
+#endif
     if (ignore_mods || (controller_button_state & mod_buttons) == (ctrl_buttons_gamekey & mod_buttons))
         result = (controller_button_state & ctrl_buttons_gamekey) == ctrl_buttons_gamekey;
 

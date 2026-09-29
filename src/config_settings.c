@@ -490,6 +490,11 @@ TbBool load_settings(void)
                     settings.kbkeys[i].code = name_to_keycode(value_string(vcode));
                 if (vmods && value_type(vmods) == VALUE_STRING)
                     settings.kbkeys[i].mods = name_to_kmod(value_string(vmods));
+#if defined(KFX_PSP)
+                // Controller bindings can't be changed in-game, so the PSP
+                // always uses its built-in layout rather than stale saved ones.
+                vcontroller_buttons = NULL;
+#endif
                 if (vcontroller_buttons)
                 {
                     if (value_type(vcontroller_buttons) == VALUE_STRING)
