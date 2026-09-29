@@ -30,7 +30,11 @@
 extern "C" {
 #endif
 /******************************************************************************/
+#if defined(KFX_PSP)
+#define OBJECT_TYPES_MAX 512 // PSP: sized for the shipped configs, to save memory
+#else
 #define OBJECT_TYPES_MAX  2000
+#endif
 
 enum ObjectCategoryIndex {
     OCtg_None = 0,

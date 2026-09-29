@@ -31,11 +31,19 @@ extern "C" {
 #endif
 
 /******************************************************************************/
+#if defined(KFX_PSP)
+#define MAGIC_ITEMS_MAX         256 // PSP: sized for the shipped configs, to save memory
+#else
 #define MAGIC_ITEMS_MAX         2000
+#endif
 #define SPELL_MAX_LEVEL         9
 #define POWER_MAX_LEVEL         8
 #define MAGIC_OVERCHARGE_LEVELS (POWER_MAX_LEVEL+1)
+#if defined(KFX_PSP)
+#define POWER_TYPES_MAX 256 // PSP: sized for the shipped configs, to save memory
+#else
 #define POWER_TYPES_MAX         2000
+#endif
 
 enum CreatureSpellAffectedFlags {
     CSAfF_Slow         = 0x000001,

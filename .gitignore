@@ -57,3 +57,4 @@ debug.log
 # Personal CMake presets (per-dev deploy path etc.) - see CMakeUserPresets.json.example
 /CMakeUserPresets.json
 /out-psp/
+/out-psp-dbg/

@@ -47,7 +47,11 @@ extern "C" {
 /** Amount of instances. */
 /** Max amount of rooms needed for a creature to be attracted to a dungeon. */
 #define ENTRANCE_ROOMS_COUNT               3
+#if defined(KFX_PSP)
+#define INSTANCE_TYPES_MAX 256 // PSP: sized for the shipped configs, to save memory
+#else
 #define INSTANCE_TYPES_MAX 2000
+#endif
 #define LAIR_ENEMY_MAX 5
 
 #define INVALID_CRTR_CONTROL (&game.cctrl_data[0])

@@ -18,9 +18,12 @@
 #include <cstring>
 #include "post_inc.h"
 
-/* Take all user memory for the newlib heap, keeping 2 MB back for thread
- * stacks and SDL/audio kernel allocations. */
-PSP_HEAP_SIZE_KB(-2048);
+/* Take all user memory for the newlib heap except 4 MB kept back for thread
+ * stacks and kernel-side allocations (audio, input, file I/O). A negative
+ * heap size means "all but the threshold"; its magnitude is ignored, and the
+ * default threshold left only ~0.7 MB free once the game had started. */
+PSP_HEAP_SIZE_KB(-1);
+PSP_HEAP_THRESHOLD_SIZE_KB(4096);
 PSP_MAIN_THREAD_STACK_SIZE_KB(1024);
 
 const char* PlatformPSP::GetOSVersion() const { return "PSP"; }
@@ -62,8 +65,29 @@ static int append_args_file(int argc, char **argv, char **out, int max_args)
     return n;
 }
 
+#if defined(KFX_GAME_ON_HEAP)
+#include "game_legacy.h" // kfx_game_ptr
+#endif
+
+// Written before anything else, so there is a trace even if the game dies
+// before keeperfx.log is created.
+static void write_boot_report(void)
+{
+    FILE* f = fopen("psp_boot.txt", "w");
+    if (f == NULL)
+        return;
+    fprintf(f, "KeeperFX PSP boot\n");
+    fprintf(f, "free memory: %u KB total, %u KB largest block\n",
+        (unsigned)(sceKernelTotalFreeMemSize() / 1024), (unsigned)(sceKernelMaxFreeMemSize() / 1024));
+#if defined(KFX_GAME_ON_HEAP)
+    fprintf(f, "game state: %p (%u KB)\n", (void*)kfx_game_ptr, (unsigned)(sizeof(*kfx_game_ptr) / 1024));
+#endif
+    fclose(f);
+}
+
 int main(int argc, char *argv[])
 {
+    write_boot_report();
     // Homebrew starts at 222 MHz; the game needs the full 333 MHz.
     scePowerSetClockFrequency(333, 333, 166);
     static char* args[64];

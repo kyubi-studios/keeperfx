@@ -30,9 +30,16 @@ extern "C" {
 #endif
 /******************************************************************************/
 
+#if defined(KFX_PSP)
+// PSP: sized for the shipped configs, to save memory
+#define EFFECTS_TYPES_MAX 512
+#define EFFECTSGEN_TYPES_MAX 512
+#define EFFECTSELLEMENTS_TYPES_MAX 512
+#else
 #define EFFECTS_TYPES_MAX 2048
 #define EFFECTSGEN_TYPES_MAX 2048
 #define EFFECTSELLEMENTS_TYPES_MAX 2048
+#endif
 
 /******************************************************************************/
 
