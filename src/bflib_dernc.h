@@ -64,6 +64,8 @@ long rnc_unpack (const void *packed, void *unpacked, unsigned int flags);
 long rnc_unpack (const void *packed, void *unpacked, unsigned int flags, int32_t *leeway);
 #endif
 long rnc_crc (void *data, unsigned long len);
+/** Continues an rnc_crc() over further data, for checksumming in chunks. */
+long rnc_crc_update(long crc, void *data, unsigned long len);
 /******************************************************************************/
 
 #ifdef __cplusplus

@@ -145,8 +145,14 @@ void FreeVRes256Data(void)
     LbTextInvalidateFontGeneration();
 }
 
+/** Whether LoadVResMinimal() data (frontend fonts, buttons) is currently loaded.
+ *  The frontend always uses the 640x480 assets scaled to the screen, so it is
+ *  loaded for any frontend resolution, not only hi-res ones. */
+static TbBool vres_minimal_loaded = false;
+
 short LoadVResMinimal(void)
 {
+    vres_minimal_loaded = true;
     button_sprites = load_spritesheet("data/gui1-32.dat", "data/gui1-32.tab");
 #ifdef SPRITE_FORMAT_V2
     frontend_font[0] = load_font("ldata/frontft1-64.dat", "ldata/frontft1-64.tab");
@@ -165,6 +171,7 @@ short LoadVResMinimal(void)
 
 void FreeVResMinimal(void)
 {
+    vres_minimal_loaded = false;
     for (int i = 0; i < FRONTEND_FONTS_COUNT; ++i) {
         free_font(&frontend_font[i]);
     }
@@ -668,7 +675,7 @@ TbScreenMode setup_screen_mode(TbScreenMode nmode, TbBool failsafe)
     if (nmode != old_mode)
         RendererResetScreen(false);
     if (MinimalResolutionSetup) {
-      if (hi_res) {
+      if (vres_minimal_loaded) {
         FreeVResMinimal();
       }
     } else {
@@ -839,17 +846,13 @@ TbScreenMode setup_screen_mode_minimal(TbScreenMode nmode)
       unload_pointer_file(hi_res);
     if ((nmode != old_mode) || (force_video_mode_reset))
       RendererResetScreen(false);
-    if (hi_res)
+    if (MinimalResolutionSetup)
     {
-      if (MinimalResolutionSetup) {
-        FreeVResMinimal();
-      } else {
-        FreeVRes256Data();
-      }
+      if (vres_minimal_loaded) FreeVResMinimal();
     }
     else
     {
-      if (!MinimalResolutionSetup) FreeMcgaData();
+      if (hi_res) FreeVRes256Data(); else FreeMcgaData();
     }
     MinimalResolutionSetup = false;
   }
@@ -863,7 +866,8 @@ TbScreenMode setup_screen_mode_minimal(TbScreenMode nmode)
   {
     SYNCDBG(17,"Preparing minimal %s resolution mode",(hi_res ? "high" : "low"));
     MinimalResolutionSetup = true;
-    if (hi_res)
+    // Frontend assets are 640x480 and scaled to the screen, so load them for
+    // low-res frontends too (e.g. the PSP's 480x272) -- otherwise menus have no fonts.
     {
       frontend_load_data_from_cd();
       if (!LoadVResMinimal())

@@ -2169,6 +2169,11 @@ int LbBullfrogMain(unsigned short argc, char *argv[])
         {            
             dbc_initialized = 1;
         }
+#if defined(KFX_PSP)
+        // Unifont glyph tables cost several MB; the PSP only loads them for
+        // the double-byte languages that can't be drawn with the DK fonts.
+        if (dbc_initialized)
+#endif
         load_unifont_files();
     }
     if ( retval == 1 )

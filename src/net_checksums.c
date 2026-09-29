@@ -19,6 +19,7 @@
 #include "pre_inc.h"
 #include "net_checksums.h"
 #include "bflib_dernc.h"
+#include "bflib_fileio.h"
 #include "config.h"
 #include "game_legacy.h"
 #include "game_merge.h"
@@ -258,6 +259,29 @@ TbBigChecksum calculate_file_checksum(const char *fname)
     CHECKSUM_ADD(checksum, file_size);
     if (file_size <= 0) {
         return checksum;
+    }
+    // Plain (not RNC-packed) files are checksummed in chunks, so large sprite
+    // zips don't need a whole-file buffer; RNC files must be unpacked first.
+    TbFileHandle handle = LbFileOpen(fname, Lb_FILE_MODE_READ_ONLY);
+    if (handle) {
+        static unsigned char chunk[64 * 1024];
+        int32_t len = LbFileRead(handle, chunk, sizeof(chunk));
+        TbBool packed = (len >= 4) && (chunk[0] == 'R') && (chunk[1] == 'N') && (chunk[2] == 'C') && (chunk[3] == 1);
+        if (!packed && len > 0) {
+            long crc = 0;
+            int32_t total = 0;
+            while (len > 0) {
+                crc = rnc_crc_update(crc, chunk, len);
+                total += len;
+                len = LbFileRead(handle, chunk, sizeof(chunk));
+            }
+            LbFileClose(handle);
+            if (total == file_size) {
+                CHECKSUM_ADD(checksum, crc);
+            }
+            return checksum;
+        }
+        LbFileClose(handle);
     }
     unsigned char *file_buf = malloc(file_size);
     if (file_buf != NULL && LbFileLoadAt(fname, file_buf) == file_size) {

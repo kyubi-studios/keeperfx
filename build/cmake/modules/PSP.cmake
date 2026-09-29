@@ -11,7 +11,7 @@ kfx_status("PLATFORM" "Sony PSP (MIPS Allegrex, pspdev)")
 
 set(KFX_PSP_DEPS "${CMAKE_SOURCE_DIR}/deps/psp")
 
-add_compile_definitions("DEBUG=$<IF:$<CONFIG:Debug>,1,0>" _GNU_SOURCE KFX_PSP=1 KFX_NO_OPENGL=1 KFX_NO_NETWORK=1 KFX_NO_FMV=1)
+add_compile_definitions("DEBUG=$<IF:$<CONFIG:Debug>,1,0>" _GNU_SOURCE KFX_PSP=1 KFX_NO_OPENGL=1 KFX_NO_NETWORK=1 KFX_NO_FMV=1 KFX_LAZY_SOUND_BANKS=1)
 
 # ---- Sources ----
 file(GLOB_RECURSE KEEPERFX_SOURCES_C   CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.c")
@@ -81,6 +81,18 @@ target_link_libraries(keeperfx PRIVATE
     pspvfpu atomic pthread stdc++ m)
 
 target_link_options(keeperfx PRIVATE -Wl,-Map,keeperfx.map)
+
+option(KFX_PSP_MEMDEBUG "Log large heap allocations and allocation failures to stderr" OFF)
+option(KFX_PSP_PERFLOG "Log presented frames per second to keeperfx.log" OFF)
+if(KFX_PSP_PERFLOG)
+    target_compile_definitions(keeperfx PRIVATE KFX_PSP_PERFLOG=1)
+endif()
+if(KFX_PSP_MEMDEBUG)
+    target_link_options(keeperfx PRIVATE -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=free)
+else()
+    list(FILTER KEEPERFX_SOURCES_C EXCLUDE REGEX "/psp_memdebug\\.c$")
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/src/psp/psp_memdebug.c" PROPERTIES HEADER_FILE_ONLY ON)
+endif()
 
 include("${PSPDEV}/psp/share/CreatePBP.cmake")
 create_pbp_file(

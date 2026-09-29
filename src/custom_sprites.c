@@ -134,7 +134,7 @@ static unsigned char big_scratch_data[1024*1024*16] = {0};
 #endif
 unsigned char *big_scratch = big_scratch_data;
 
-static void compress_raw(struct TbHugeSprite *sprite, unsigned char *src_buf, int x, int y, int w, int h, const uint8_t *conversion_table);
+static size_t compress_raw(struct TbHugeSprite *sprite, unsigned char *src_buf, int x, int y, int w, int h, const uint8_t *conversion_table);
 static uint8_t *create_rgb_to_pal_table(const uint8_t *palette);
 struct SheetLoadContext
 {
@@ -956,7 +956,7 @@ static size_t decode_png_to_sprite(unzFile zip, const char *path, const char *su
         return 0;
     }
 
-    compress_raw(sprite, dst_buf,
+    size_t used = compress_raw(sprite, dst_buf,
                  0, 0,
                  sprite->SWidth,
                  sprite->SHeight,
@@ -964,6 +964,14 @@ static size_t decode_png_to_sprite(unzFile zip, const char *path, const char *su
 
     spng_ctx_free(ctx);
 
+    // The buffer is sized for the worst case; RLE output is usually far smaller.
+    if (used > 0 && used < sz)
+    {
+        unsigned char *shrunk = realloc(sprite->Data, used);
+        if (shrunk != NULL)
+            sprite->Data = shrunk;
+        sz = used;
+    }
     return sz;
 }
 
@@ -1060,16 +1068,30 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
         ERRORLOG("Too many custom sprites allocated");
         return 0;
     }
+    size_t sz = (dst_w + 2) * (dst_h + 3);
+    unsigned char *sprite_data = malloc(sz);
+    if (sprite_data == NULL)
+    {
+        ERRORLOG("Unable to allocate %u bytes for sprite %s/%s", (unsigned)sz, path, subpath);
+        return 0;
+    }
     short sprite_idx = next_free_sprite;
     next_free_sprite++;
     if (*context->id_ptr == 0) // First sprite for current view (FP/TD)
         *context->id_ptr = sprite_idx + KEEPERSPRITE_ADD_OFFSET;
     (*context->id_sz_ptr)++; // Add new sprite for current view (FP/TD)
 
-    size_t sz = (dst_w + 2) * (dst_h + 3);
-    keepersprite_add[sprite_idx] = malloc(sz);
+    keepersprite_add[sprite_idx] = sprite_data;
     context->sprite.Data = keepersprite_add[sprite_idx];
-    compress_raw(&context->sprite, dst_buf, context->x, context->y, dst_w, dst_h, NULL);
+    size_t used = compress_raw(&context->sprite, dst_buf, context->x, context->y, dst_w, dst_h, NULL);
+    // The buffer is sized for the worst case; RLE output is usually far smaller.
+    if (used > 0 && used < sz)
+    {
+        unsigned char *shrunk = realloc(keepersprite_add[sprite_idx], used);
+        if (shrunk != NULL)
+            keepersprite_add[sprite_idx] = shrunk;
+        context->sprite.Data = keepersprite_add[sprite_idx];
+    }
     struct KeeperSprite *ksprite = &creature_table_add[sprite_idx];
 
     if (context->ksp_first == NULL)
@@ -1203,7 +1225,8 @@ static void load_rgb_to_pal_table()
     rgb_to_pal_table = create_rgb_to_pal_table(palette);
 }
 
-static void compress_raw(struct TbHugeSprite *sprite, unsigned char *inp_buf, int x, int y, int w, int h, const uint8_t *conversion_table)
+/** RLE-encodes the sprite into sprite->Data; returns the number of bytes written. */
+static size_t compress_raw(struct TbHugeSprite *sprite, unsigned char *inp_buf, int x, int y, int w, int h, const uint8_t *conversion_table)
 {
     #define TEST_TRANSP(x) ((x & 0xFF000000u) < 0x40000000u)
     if (conversion_table == NULL)
@@ -1213,7 +1236,7 @@ static void compress_raw(struct TbHugeSprite *sprite, unsigned char *inp_buf, in
     }
     if (conversion_table == NULL)
     {
-        return;
+        return 0;
     }
     unsigned char *buf = sprite->Data;
     uint32_t *src_buf = (uint32_t *) inp_buf;
@@ -1275,6 +1298,7 @@ static void compress_raw(struct TbHugeSprite *sprite, unsigned char *inp_buf, in
         src_buf += tail;
     }
     #undef TEST_TRANSP
+    return buf - sprite->Data;
 }
 
 #if BFDEBUG_LEVEL > 0

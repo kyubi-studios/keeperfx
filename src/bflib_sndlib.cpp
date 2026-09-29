@@ -351,6 +351,27 @@ struct sound_sample {
 	sound_sample(const char * _name, SoundSFXID _sfx_id, const wave_file & wav) {
 		name = _name;
 		sfx_id = _sfx_id;
+		upload(wav);
+	}
+
+#if defined(KFX_LAZY_SOUND_BANKS)
+	// Deferred bank sample: PCM is read from the bank file on first play and
+	// may be dropped again under memory pressure (see resolve_bank_sample()).
+	int bank_index = -1;
+	uint32_t file_offset = 0;
+	bool loaded = false;
+	size_t resident_bytes = 0;
+	unsigned long last_use = 0;
+
+	sound_sample(const char * _name, SoundSFXID _sfx_id, int _bank_index, uint32_t _file_offset) {
+		name = _name;
+		sfx_id = _sfx_id;
+		bank_index = _bank_index;
+		file_offset = _file_offset;
+	}
+#endif
+
+	void upload(const wave_file & wav) {
 		const auto & pcm = wav.pcm();
 		const auto format = wav.format();
 		if (format == AL_FORMAT_MONO_MSADPCM_SOFT) {
@@ -414,7 +435,12 @@ struct SoundBankEntry { // sizeof = 16
 };
 #pragma pack()
 
-std::vector<sound_sample> load_sound_bank(const char * filename) {
+#if defined(KFX_LAZY_SOUND_BANKS)
+std::string g_bank_paths[2];
+size_t g_lazy_resident = 0; // PCM bytes currently uploaded from the banks
+#endif
+
+std::vector<sound_sample> load_sound_bank(const char * filename, int bank_index) {
 	const int directory_index = 2; // a5 was always 1622
 	std::ifstream stream(filename, std::ios::in | std::ios::binary);
 	if (!stream.is_open()) {
@@ -442,9 +468,16 @@ std::vector<sound_sample> load_sound_bank(const char * filename) {
 	for (int i = 0; i < sample_count; ++i) {
 		stream.seekg(directory.first_sample_offset + (sizeof(sample) * i), std::ios::beg);
 		stream.read(reinterpret_cast<char *>(&sample), sizeof(sample));
+#if defined(KFX_LAZY_SOUND_BANKS)
+		buffers.emplace_back(sample.filename, sample.sfxid, bank_index, directory.first_data_offset + sample.data_offset);
+#else
 		stream.seekg(directory.first_data_offset + sample.data_offset, std::ios::beg);
 		buffers.emplace_back(sample.filename, sample.sfxid, wave_file(stream));
+#endif
 	}
+#if defined(KFX_LAZY_SOUND_BANKS)
+	g_bank_paths[bank_index] = filename;
+#endif
 	return buffers;
 }
 
@@ -514,8 +547,8 @@ void load_sound_banks() {
 	if (!LbFileExists(spc_fname)) {
 		spc_fname = prepare_file_fmtpath(FGrp_LrgSound, "speech_%s.dat", get_language_lwrstr(1));
 	}
-	g_banks[0] = load_sound_bank(snd_fname);
-	g_banks[1] = load_sound_bank(spc_fname);
+	g_banks[0] = load_sound_bank(snd_fname, 0);
+	g_banks[1] = load_sound_bank(spc_fname, 1);
 	LbJustLog("Loaded %s (%d samples), %s (%d samples)\n",
 		snd_fname, (int)g_banks[0].size(), spc_fname, (int)g_banks[1].size());
 	g_speech_offset = (SoundSmplTblID)g_banks[0].size();
@@ -601,6 +634,9 @@ extern "C" void FreeAudio() {
 	g_sources.clear();
 	g_banks[0].clear();
 	g_banks[1].clear();
+#if defined(KFX_LAZY_SOUND_BANKS)
+	g_lazy_resident = 0;
+#endif
 	g_custom_bank.clear();  // Clear custom sounds when cleaning up audio
 	g_id_redirects.clear(); // Clear raw-ID redirects alongside custom bank
 	g_stack_policies.clear(); // Clear stacking policies alongside custom bank
@@ -702,6 +738,18 @@ extern "C" TbBool play_music(const char * fname) {
 	if (!g_mixer || !g_music_track) {
 		return false;
 	}
+#if defined(KFX_PSP)
+	// Stream straight from the memory stick: MIX_LoadAudio keeps the whole
+	// compressed file in RAM (several MB per track), which the PSP can't spare.
+	SDL_IOStream* music_io = SDL_IOFromFile(game.music_fname, "rb");
+	if (!music_io || !MIX_SetTrackIOStream(g_music_track, music_io, true)) {
+		WARNLOG("Cannot load music from %s: %s", game.music_fname, SDL_GetError());
+		return false;
+	}
+	if (MIX_Audio* old_audio = std::exchange(g_music_audio, (MIX_Audio*)nullptr)) {
+		MIX_DestroyAudio(old_audio);
+	}
+#else
 	// SDL3_mixer: load into a MIX_Audio and bind it to the persistent music track.
 	MIX_Audio* new_audio = MIX_LoadAudio(g_mixer, game.music_fname, false);
 	if (!new_audio) {
@@ -715,6 +763,7 @@ extern "C" TbBool play_music(const char * fname) {
 	if (old_audio) {
 		MIX_DestroyAudio(old_audio);
 	}
+#endif
 	if (!MIX_PlayTrack(g_music_track, 0)) {
 		WARNLOG("Cannot play music from %s: %s", game.music_fname, SDL_GetError());
 		return false;
@@ -1060,6 +1109,67 @@ extern "C" void SetSamplePitch(SoundEmitterID emit_id, SoundSmplTblID smptbl_id,
 	}
 }
 
+#if defined(KFX_LAZY_SOUND_BANKS)
+// Budget for PCM kept resident in OpenAL from the effect/speech banks.
+constexpr size_t LAZY_BANK_BUDGET = 3 * 1024 * 1024;
+unsigned long g_lazy_clock = 0;
+
+// Drop a sample's PCM unless a source is still playing it.
+bool evict_bank_sample(sound_sample & smp) {
+	for (auto & src : g_sources) {
+		ALint attached = 0;
+		alGetSourcei(src.id, AL_BUFFER, &attached);
+		if ((ALuint)attached != smp.buffer.id)
+			continue;
+		if (src.is_playing())
+			return false;
+		alSourcei(src.id, AL_BUFFER, 0);
+	}
+	alDeleteBuffers(1, &smp.buffer.id);
+	alGenBuffers(1, &smp.buffer.id);
+	alGetError();
+	g_lazy_resident -= smp.resident_bytes;
+	smp.resident_bytes = 0;
+	smp.loaded = false;
+	return true;
+}
+
+// Evict least-recently-played samples until `bytes` more fit in the budget.
+void make_room_for(size_t bytes) {
+	if (g_lazy_resident + bytes <= LAZY_BANK_BUDGET)
+		return;
+	std::vector<sound_sample *> resident;
+	for (auto & bank : g_banks)
+		for (auto & smp : bank)
+			if (smp.loaded)
+				resident.push_back(&smp);
+	std::sort(resident.begin(), resident.end(),
+		[](const sound_sample * a, const sound_sample * b) { return a->last_use < b->last_use; });
+	for (auto * smp : resident) {
+		if (g_lazy_resident + bytes <= LAZY_BANK_BUDGET)
+			break;
+		evict_bank_sample(*smp); // skipped while still playing
+	}
+}
+
+const openal_buffer * resolve_bank_sample(sound_sample & smp) {
+	smp.last_use = ++g_lazy_clock;
+	if (smp.loaded)
+		return &smp.buffer;
+	std::ifstream stream(g_bank_paths[smp.bank_index], std::ios::in | std::ios::binary);
+	if (!stream.is_open())
+		throw std::runtime_error("Cannot open sound bank file");
+	stream.seekg(smp.file_offset, std::ios::beg);
+	wave_file wav(stream);
+	make_room_for(wav.pcm().size());
+	smp.upload(wav);
+	smp.loaded = true;
+	smp.resident_bytes = wav.pcm().size();
+	g_lazy_resident += smp.resident_bytes;
+	return &smp.buffer;
+}
+#endif
+
 extern "C" SoundMilesID play_sample(
 	SoundEmitterID emit_id,
 	SoundSmplTblID smptbl_id,
@@ -1095,7 +1205,16 @@ extern "C" SoundMilesID play_sample(
 			ERRORLOG("Can't play speech sample %d, out of range", smptbl_id);
 			return 0;
 		}
+#if defined(KFX_LAZY_SOUND_BANKS)
+		try {
+			buf = resolve_bank_sample(g_banks[1][idx]);
+		} catch (const std::exception & e) {
+			ERRORLOG("Can't load speech sample %d: %s", smptbl_id, e.what());
+			return 0;
+		}
+#else
 		buf = &g_banks[1][idx].buffer;
+#endif
 	} else {
 		if (smptbl_id <= 0 || smptbl_id >= (SoundSmplTblID)g_banks[0].size()) {
 			if (smptbl_id != 0) {
@@ -1103,7 +1222,16 @@ extern "C" SoundMilesID play_sample(
 			}
 			return 0;
 		}
+#if defined(KFX_LAZY_SOUND_BANKS)
+		try {
+			buf = resolve_bank_sample(g_banks[0][smptbl_id]);
+		} catch (const std::exception & e) {
+			ERRORLOG("Can't load effect sample %d: %s", smptbl_id, e.what());
+			return 0;
+		}
+#else
 		buf = &g_banks[0][smptbl_id].buffer;
+#endif
 	}
 	try {
 		// Look up the stacking policy once — used by both the restart-in-place path below

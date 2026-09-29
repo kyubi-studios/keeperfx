@@ -392,6 +392,11 @@ short crctab_ready=false;
 // Calculate a CRC, the RNC way
 long rnc_crc(void *data, unsigned long len)
 {
+  return rnc_crc_update(0, data, len);
+}
+
+long rnc_crc_update(long crc, void *data, unsigned long len)
+{
   unsigned short val;
   unsigned char *p = (unsigned char *)data;
   //computing CRC table
@@ -413,7 +418,7 @@ long rnc_crc(void *data, unsigned long len)
   crctab_ready=true;
   }
 
-  val = 0;
+  val = (unsigned short)crc;
   while (len--)
   {
      val ^= *p++;

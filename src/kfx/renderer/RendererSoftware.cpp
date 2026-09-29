@@ -10,6 +10,7 @@
 #include "kfx/renderer/RenderGraph.h"
 #include "kfx/renderer/RenderTaskProducerRegistry.h"
 #include "kfx/renderer/RendererFrameCounter.h"
+#include "bflib_basics.h"      // LbJustLog
 #include "bflib_mouse.h"       // LbMouseOnBeginSwap/EndSwap (submits the cursor sprite around present)
 #include <SDL3_image/SDL_image.h> // IMG_SavePNG (screenshots)
 #include "post_inc.h"
@@ -371,4 +372,19 @@ void RendererSoftware::PresentFrame()
     SDL_RenderTexture(m_renderer, m_texture, NULL, (pw > 0 && ph > 0) ? &dst : NULL);
     SDL_RenderPresent(m_renderer);
     LbMouseOnEndSwap();
+#if defined(KFX_PSP_PERFLOG)
+    // Presented frames per 5 s, for tuning on the PSP.
+    static Uint64 s_perf_start = 0;
+    static int s_perf_frames = 0;
+    const Uint64 now = SDL_GetTicks();
+    if (s_perf_start == 0)
+        s_perf_start = now;
+    s_perf_frames++;
+    if (now - s_perf_start >= 5000) {
+        LbJustLog("PSP perf: %d frames in %u ms (%.1f fps)\n", s_perf_frames,
+            (unsigned)(now - s_perf_start), s_perf_frames * 1000.0 / (double)(now - s_perf_start));
+        s_perf_start = now;
+        s_perf_frames = 0;
+    }
+#endif
 }
