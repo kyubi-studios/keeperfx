@@ -97,6 +97,15 @@ else()
     set_source_files_properties("${CMAKE_SOURCE_DIR}/src/psp/psp_memdebug.c" PROPERTIES HEADER_FILE_ONLY ON)
 endif()
 
+# Signed (encrypted) PRX, which would also start without custom firmware
+# (unsigned homebrew fails there with 80020148). Off: PrxEncrypter can only
+# forge headers for PRX files up to ~5.5 MB and KeeperFX's is ~10 MB, so the
+# EBOOT needs an active custom firmware (PRO/LME/ARK/Infinity).
+option(KFX_PSP_ENC_PRX "Encrypt/sign the PRX inside EBOOT.PBP" OFF)
+if(KFX_PSP_ENC_PRX)
+    set(KFX_PSP_ENC_ARG ENC_PRX)
+endif()
+
 include("${PSPDEV}/psp/share/CreatePBP.cmake")
 create_pbp_file(
     TARGET keeperfx
@@ -106,6 +115,7 @@ create_pbp_file(
     PREVIEW_PATH NULL
     MEMSIZE 1 # PSP-2000+ extended (~52 MB) user memory
     BUILD_PRX
+    ${KFX_PSP_ENC_ARG}
 )
 
 kfx_status("BUILD" "${CMAKE_CXX_COMPILER_ID} -> keeperfx (EBOOT.PBP)")
