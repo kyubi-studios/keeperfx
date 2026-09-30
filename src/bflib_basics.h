@@ -25,6 +25,11 @@
 #include <stdint.h>
 #include "compiler_compat.h"
 
+#ifndef PSP_PHASE
+/* Startup phase timing; only implemented on the PSP (src/psp/psp_trace.h). */
+#define PSP_PHASE(name) ((void)0)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

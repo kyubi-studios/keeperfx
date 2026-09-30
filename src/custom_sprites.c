@@ -143,6 +143,15 @@ struct SheetLoadContext
     const uint8_t *conversion_table;
 };
 static TbBool add_custom_sprite(const char *path);
+#if defined(KFX_SPRITE_CACHE)
+static void sprite_cache_begin(const char *zip_path, const char *kind);
+static void sprite_cache_end(TbBool ok);
+#endif
+static void json_zip_share_begin(void);
+static void json_zip_share_end(void);
+struct SpriteContext;
+static int finish_png_sprite(struct SpriteContext *context, int dst_w, int dst_h, unsigned char *sprite_data,
+                             int is_fp, VALUE *def, VALUE *itm);
 
 static TbBool add_custom_json(const char *path, const char *name, TbBool (*process)(const char *path, unzFile zip, VALUE *root));
 static TbBool add_custom_json_with_data(const char *path, const char *name, TbBool (*process)(const char *path, unzFile zip, VALUE *root, void *data), void *data);
@@ -240,15 +249,27 @@ static int load_file_sprites(const char *path, const char *file_desc, unsigned i
 {
     SYNCDBG(8, "Starting");
     int add_flag = 0;
+    json_zip_share_begin();
     if (load_flags & CLF_Sprites && add_custom_sprite(path))
     {
         add_flag |= CLF_Sprites;
     }
 
+#if defined(KFX_SPRITE_CACHE)
+    if (load_flags & CLF_Icons)
+    {
+        sprite_cache_begin(path, "icons");
+        TbBool icons_ok = add_custom_json(path, "icons.json", &process_icon);
+        sprite_cache_end(icons_ok);
+        if (icons_ok)
+            add_flag |= CLF_Icons;
+    }
+#else
     if (load_flags & CLF_Icons && add_custom_json(path, "icons.json", &process_icon))
     {
         add_flag |= CLF_Icons;
     }
+#endif
 
     if (load_flags & CLF_Ensigns && add_custom_json(path, "ensigns.json", &process_ensign))
     {
@@ -264,6 +285,7 @@ static int load_file_sprites(const char *path, const char *file_desc, unsigned i
     {
         add_flag |= CLF_LensMists;
     }
+    json_zip_share_end();
 
     if (file_desc != NULL)
     {
@@ -920,7 +942,158 @@ static int read_png_icon(unzFile zip, const char *path, const char *subpath, int
     return 1;
 }
 
+#if defined(KFX_SPRITE_CACHE)
+/*
+ * Decoded sprite cache. Decoding the PNGs of the sprite zips is the bulk of
+ * the startup time on slow hardware (PSP), so the result of every PNG decode
+ * while loading a zip's sprites.json / icons.json is stored next to the zip
+ * ("<zip>.kfxc", "<zip>.icons.kfxc") and replayed in the same order on the
+ * next start. The cache is keyed on the zip's size
+ * and modification time; anything unexpected falls back to decoding.
+ */
+#include <sys/stat.h>
+
+#define SPRITE_CACHE_MAGIC "KFXSPRC1"
+
+static struct {
+    FILE *in;           // replaying from an existing cache
+    FILE *out;          // recording a new cache
+    TbBool broken;      // recording can't produce a usable file
+    char final_path[1024];
+    char temp_path[1024];
+} sprite_cache;
+
+struct SpriteCacheHeader {
+    char magic[8];
+    uint32_t zip_size;
+    uint32_t zip_mtime;
+};
+
+static void sprite_cache_begin(const char *zip_path, const char *kind)
+{
+    memset(&sprite_cache, 0, sizeof(sprite_cache));
+    struct stat st;
+    if (stat(zip_path, &st) != 0)
+        return;
+    struct SpriteCacheHeader want;
+    memcpy(want.magic, SPRITE_CACHE_MAGIC, sizeof(want.magic));
+    want.zip_size = (uint32_t)st.st_size;
+    want.zip_mtime = (uint32_t)st.st_mtime;
+    snprintf(sprite_cache.final_path, sizeof(sprite_cache.final_path), "%s%s%s.kfxc", zip_path, kind ? "." : "", kind ? kind : "");
+    snprintf(sprite_cache.temp_path, sizeof(sprite_cache.temp_path), "%s.tmp", sprite_cache.final_path);
+
+    FILE *in = fopen(sprite_cache.final_path, "rb");
+    if (in != NULL) {
+        struct SpriteCacheHeader have;
+        if (fread(&have, sizeof(have), 1, in) == 1 && memcmp(&have, &want, sizeof(want)) == 0) {
+            setvbuf(in, NULL, _IOFBF, 64 * 1024);
+            sprite_cache.in = in;
+            return;
+        }
+        fclose(in);
+    }
+    sprite_cache.out = fopen(sprite_cache.temp_path, "wb");
+    if (sprite_cache.out != NULL) {
+        setvbuf(sprite_cache.out, NULL, _IOFBF, 64 * 1024);
+        if (fwrite(&want, sizeof(want), 1, sprite_cache.out) != 1)
+            sprite_cache.broken = true;
+    }
+}
+
+static void sprite_cache_end(TbBool ok)
+{
+    if (sprite_cache.in != NULL) {
+        fclose(sprite_cache.in);
+        sprite_cache.in = NULL;
+        if (sprite_cache.broken) // replay went out of step: rebuild next time
+            remove(sprite_cache.final_path);
+    }
+    if (sprite_cache.out != NULL) {
+        TbBool good = (fclose(sprite_cache.out) == 0) && ok && !sprite_cache.broken;
+        sprite_cache.out = NULL;
+        remove(sprite_cache.final_path);
+        if (!good || rename(sprite_cache.temp_path, sprite_cache.final_path) != 0)
+            remove(sprite_cache.temp_path);
+    }
+}
+
+/** Replays one cached sprite. @return 1 ok, 0 decoding had failed, -1 no usable cache entry. */
+static int sprite_cache_read(int *w, int *h, unsigned char **data, size_t *len)
+{
+    if (sprite_cache.in == NULL)
+        return -1;
+    uint8_t status;
+    uint16_t dims[2];
+    uint32_t size;
+    if (fread(&status, 1, 1, sprite_cache.in) != 1 || fread(dims, sizeof(dims), 1, sprite_cache.in) != 1 ||
+        fread(&size, sizeof(size), 1, sprite_cache.in) != 1 || size > 1024 * 1024)
+        goto bad;
+    *w = dims[0];
+    *h = dims[1];
+    *len = size;
+    *data = NULL;
+    if (status == 0)
+        return 0;
+    *data = malloc(size > 0 ? size : 1);
+    if (*data == NULL || fread(*data, 1, size, sprite_cache.in) != size) {
+        free(*data);
+        *data = NULL;
+        goto bad;
+    }
+    return 1;
+bad:
+    // Out of step with the zip; decode the rest normally.
+    fclose(sprite_cache.in);
+    sprite_cache.in = NULL;
+    sprite_cache.broken = true;
+    return -1;
+}
+
+static void sprite_cache_write(int ok, int w, int h, const unsigned char *data, size_t len)
+{
+    if (sprite_cache.out == NULL || sprite_cache.broken)
+        return;
+    uint8_t status = ok ? 1 : 0;
+    uint16_t dims[2] = {(uint16_t)w, (uint16_t)h};
+    uint32_t size = ok ? (uint32_t)len : 0;
+    if (fwrite(&status, 1, 1, sprite_cache.out) != 1 || fwrite(dims, sizeof(dims), 1, sprite_cache.out) != 1 ||
+        fwrite(&size, sizeof(size), 1, sprite_cache.out) != 1 || (size > 0 && fwrite(data, 1, size, sprite_cache.out) != size))
+        sprite_cache.broken = true;
+}
+#endif
+
+static size_t decode_png_to_sprite_uncached(unzFile zip, const char *path, const char *subpath, struct TbHugeSprite *sprite, const uint8_t *conversion_table);
+
 static size_t decode_png_to_sprite(unzFile zip, const char *path, const char *subpath, struct TbHugeSprite *sprite, const uint8_t *conversion_table)
+{
+#if defined(KFX_SPRITE_CACHE)
+    if (sprite != NULL)
+    {
+        int cw, ch;
+        unsigned char *cdata;
+        size_t clen;
+        int cres = sprite_cache_read(&cw, &ch, &cdata, &clen);
+        if (cres == 0)
+            return 0;
+        if (cres > 0)
+        {
+            memset(sprite, 0, sizeof(*sprite));
+            sprite->SWidth = cw;
+            sprite->SHeight = ch;
+            sprite->Data = cdata;
+            return clen;
+        }
+    }
+    size_t sz = decode_png_to_sprite_uncached(zip, path, subpath, sprite, conversion_table);
+    if (sprite != NULL)
+        sprite_cache_write(sz > 0, sprite->SWidth, sprite->SHeight, sprite->Data, sz);
+    return sz;
+#else
+    return decode_png_to_sprite_uncached(zip, path, subpath, sprite, conversion_table);
+#endif
+}
+
+static size_t decode_png_to_sprite_uncached(unzFile zip, const char *path, const char *subpath, struct TbHugeSprite *sprite, const uint8_t *conversion_table)
 {
     size_t out_size;
 
@@ -1054,9 +1227,32 @@ static int read_png_to_sheet(unzFile zip, const char *path, const char *subpath,
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "bugprone-branch-clone"
+
 static int read_png_data(unzFile zip, const char *path, struct SpriteContext *context, const char *subpath,
                          int is_fp, VALUE *def, VALUE *itm)
 {
+#if defined(KFX_SPRITE_CACHE)
+    {
+        int cw, ch;
+        unsigned char *cdata;
+        size_t clen;
+        int cres = sprite_cache_read(&cw, &ch, &cdata, &clen);
+        if (cres == 0)
+            return 0;
+        if (cres > 0)
+        {
+            context->sprite.SWidth = cw;
+            context->sprite.SHeight = ch;
+            if (next_free_sprite >= KEEPERSPRITE_ADD_NUM)
+            {
+                ERRORLOG("Too many custom sprites allocated");
+                free(cdata);
+                return 0;
+            }
+            return finish_png_sprite(context, cw, ch, cdata, is_fp, def, itm);
+        }
+    }
+#endif
     struct TbHugeSprite *sprite = &context->sprite;
     size_t out_size;
     sprite->SHeight = 0;
@@ -1077,6 +1273,9 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
     {
         ERRORLOG("spng_get_ihdr() error: %s", spng_strerror(r));
         spng_ctx_free(ctx);
+#if defined(KFX_SPRITE_CACHE)
+        sprite_cache_write(0, 0, 0, NULL, 0);
+#endif
         return 0;
     }
 
@@ -1084,6 +1283,9 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
     {
         ERRORLOG("Wrong spec: %s/%s should be 8bit truecolor or indexed .png", path, subpath);
         spng_ctx_free(ctx);
+#if defined(KFX_SPRITE_CACHE)
+        sprite_cache_write(0, 0, 0, NULL, 0);
+#endif
         return 0;
     }
     struct spng_plte plte = {0};
@@ -1100,6 +1302,9 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
     {
         ERRORLOG("Unable to decode %s error: %s", path, spng_strerror(r));
         spng_ctx_free(ctx);
+#if defined(KFX_SPRITE_CACHE)
+        sprite_cache_write(0, 0, 0, NULL, 0);
+#endif
         return 0;
     }
 
@@ -1108,8 +1313,12 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
     {
         ERRORLOG("Unable to decode %s/%s", path, subpath);
         spng_ctx_free(ctx);
+#if defined(KFX_SPRITE_CACHE)
+        sprite_cache_write(0, 0, 0, NULL, 0);
+#endif
         return 0;
     }
+    spng_ctx_free(ctx);
 
     // This should be enough except rare cases like transparent checkerboard
     int dst_w = (int) context->sprite.SWidth;
@@ -1118,12 +1327,18 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
     if (dst_w >= 255 || dst_h >= 255)
     {
         ERRORLOG("Sprites more than 255x255 are not supported");
+#if defined(KFX_SPRITE_CACHE)
+        sprite_cache_write(0, dst_w, dst_h, NULL, 0);
+#endif
         return 0;
     }
 
     if (next_free_sprite >= KEEPERSPRITE_ADD_NUM)
     {
         ERRORLOG("Too many custom sprites allocated");
+#if defined(KFX_SPRITE_CACHE)
+        sprite_cache_write(0, dst_w, dst_h, NULL, 0);
+#endif
         return 0;
     }
     size_t sz = (dst_w + 2) * (dst_h + 3);
@@ -1131,8 +1346,30 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
     if (sprite_data == NULL)
     {
         ERRORLOG("Unable to allocate %u bytes for sprite %s/%s", (unsigned)sz, path, subpath);
+#if defined(KFX_SPRITE_CACHE)
+        sprite_cache.broken = true;
+#endif
         return 0;
     }
+    context->sprite.Data = sprite_data;
+    size_t used = compress_raw(&context->sprite, dst_buf, context->x, context->y, dst_w, dst_h, NULL);
+    // The buffer is sized for the worst case; RLE output is usually far smaller.
+    if (used > 0 && used < sz)
+    {
+        unsigned char *shrunk = realloc(sprite_data, used);
+        if (shrunk != NULL)
+            sprite_data = shrunk;
+    }
+#if defined(KFX_SPRITE_CACHE)
+    sprite_cache_write(1, dst_w, dst_h, sprite_data, used);
+#endif
+    return finish_png_sprite(context, dst_w, dst_h, sprite_data, is_fp, def, itm);
+}
+
+/** Registers a decoded, RLE-encoded keeper sprite and reads its metadata from the JSON item. */
+static int finish_png_sprite(struct SpriteContext *context, int dst_w, int dst_h, unsigned char *sprite_data,
+                             int is_fp, VALUE *def, VALUE *itm)
+{
     short sprite_idx = next_free_sprite;
     next_free_sprite++;
     if (*context->id_ptr == 0) // First sprite for current view (FP/TD)
@@ -1140,16 +1377,7 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
     (*context->id_sz_ptr)++; // Add new sprite for current view (FP/TD)
 
     keepersprite_add[sprite_idx] = sprite_data;
-    context->sprite.Data = keepersprite_add[sprite_idx];
-    size_t used = compress_raw(&context->sprite, dst_buf, context->x, context->y, dst_w, dst_h, NULL);
-    // The buffer is sized for the worst case; RLE output is usually far smaller.
-    if (used > 0 && used < sz)
-    {
-        unsigned char *shrunk = realloc(keepersprite_add[sprite_idx], used);
-        if (shrunk != NULL)
-            keepersprite_add[sprite_idx] = shrunk;
-        context->sprite.Data = keepersprite_add[sprite_idx];
-    }
+    context->sprite.Data = sprite_data;
     struct KeeperSprite *ksprite = &creature_table_add[sprite_idx];
 
     if (context->ksp_first == NULL)
@@ -1200,7 +1428,6 @@ static int read_png_data(unzFile zip, const char *path, struct SpriteContext *co
 
 #undef READ_WITH_DEFAULT
 
-    spng_ctx_free(ctx);
     return 1;
 }
 #pragma clang diagnostic pop
@@ -1596,6 +1823,68 @@ static int process_sprite_from_list(const char *path, unzFile zip, int idx, VALU
     return 1;
 }
 
+/*
+ * Zip handle (with its fastUnz lookup cache) shared by the JSON lookups of one
+ * load_file_sprites() call, so the zip directory isn't re-read for each of
+ * sprites/icons/ensigns/lenses/mists. Outside that call every lookup opens
+ * and closes its own handle, as before.
+ */
+static struct {
+    TbBool enabled;
+    unzFile zip;
+    char path[1024];
+} json_zip_share;
+
+static unzFile json_zip_open(const char *path)
+{
+    if (json_zip_share.enabled && json_zip_share.zip != NULL)
+    {
+        if (strcmp(path, json_zip_share.path) == 0)
+            return json_zip_share.zip;
+        fastUnzClearCache();
+        unzClose(json_zip_share.zip);
+        json_zip_share.zip = NULL;
+    }
+    unzFile zip = unzOpen(path);
+    if (zip == NULL)
+        return NULL;
+    if (UNZ_OK != fastUnzConstructCache(zip))
+    {
+        fastUnzClearCache();
+        unzClose(zip);
+        return NULL;
+    }
+    if (json_zip_share.enabled)
+    {
+        json_zip_share.zip = zip;
+        snprintf(json_zip_share.path, sizeof(json_zip_share.path), "%s", path);
+    }
+    return zip;
+}
+
+static void json_zip_done(unzFile zip)
+{
+    if (zip == json_zip_share.zip)
+        return;
+    fastUnzClearCache();
+    unzClose(zip);
+}
+
+static void json_zip_share_begin(void)
+{
+    json_zip_share.enabled = true;
+}
+
+static void json_zip_share_end(void)
+{
+    if (json_zip_share.zip != NULL)
+    {
+        fastUnzClearCache();
+        unzClose(json_zip_share.zip);
+    }
+    memset(&json_zip_share, 0, sizeof(json_zip_share));
+}
+
 static TbBool add_custom_json_with_data(
     const char *path,
     const char *name,
@@ -1606,18 +1895,12 @@ static TbBool add_custom_json_with_data(
         unz_file_info64 zip_info = {0};
         VALUE root;
         JSON_INPUT_POS json_input_pos;
-        unzFile zip = unzOpen(path);
+        unzFile zip = json_zip_open(path);
 
         if (zip == NULL)
         {
             JUSTLOG("add_custom_json_with_data zip == NULL");
             return 0;
-        }
-
-        if (UNZ_OK != fastUnzConstructCache(zip))
-        {
-            JUSTLOG("add_custom_json_with_data UNZ_OK != fastUnzConstructCache(zip)");
-            goto end;
         }
 
         JUSTLOG("add_custom_json_with_data name - %s",name);
@@ -1678,13 +1961,11 @@ static TbBool add_custom_json_with_data(
         JUSTLOG("add_custom_json_with_data ret_ok - %i",ret_ok);    
         value_fini(&root);
 
-        fastUnzClearCache();
-        unzClose(zip);
+        json_zip_done(zip);
 
         return ret_ok;
     end:
-        fastUnzClearCache();
-        unzClose(zip);
+        json_zip_done(zip);
         return 0;
 }
 
@@ -1695,15 +1976,10 @@ add_custom_json(const char *path, const char *name, TbBool (*process)(const char
     unz_file_info64 zip_info = {0};
     VALUE root;
     JSON_INPUT_POS json_input_pos;
-    unzFile zip = unzOpen(path);
+    unzFile zip = json_zip_open(path);
 
     if (zip == NULL)
         return 0;
-
-    if (UNZ_OK != fastUnzConstructCache(zip))
-    {
-        goto end;
-    }
     
     if (UNZ_OK != fastUnzLocateFile(zip, name, 0))
     {
@@ -1757,13 +2033,11 @@ add_custom_json(const char *path, const char *name, TbBool (*process)(const char
 
     value_fini(&root);
 
-    fastUnzClearCache();
-    unzClose(zip);
+    json_zip_done(zip);
 
     return ret_ok;
 end:
-    fastUnzClearCache();
-    unzClose(zip);
+    json_zip_done(zip);
     return 0;
 }
 
@@ -2867,7 +3141,14 @@ static TbBool process_sheet(const char *path, unzFile zip, VALUE *root, void *da
 
 static TbBool add_custom_sprite(const char *path)
 {
+#if defined(KFX_SPRITE_CACHE)
+    sprite_cache_begin(path, NULL);
+    TbBool ok = add_custom_json(path, "sprites.json", &process_sprite);
+    sprite_cache_end(ok);
+    return ok;
+#else
     return add_custom_json(path, "sprites.json", &process_sprite);
+#endif
 }
 
 short get_icon_id(const char *name)

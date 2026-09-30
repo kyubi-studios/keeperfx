@@ -10,6 +10,7 @@
 #include "kfx/platform/PlatformPSP.h"
 #include "platform.h" // kfxmain
 #include "config.h"   // keeper_runtime_directory
+#include "bflib_basics.h" // LbJustLog
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <pspkernel.h>
@@ -90,6 +91,14 @@ extern "C" void psp_trace(const char* fmt, ...)
     fclose(f);
 }
 #endif
+
+extern "C" void psp_phase(const char* name)
+{
+    static Uint64 last_ms = 0;
+    const Uint64 now = SDL_GetTicks();
+    LbJustLog("PSP load: %-22s at %6u ms (+%u ms)\n", name, (unsigned)now, (unsigned)(now - last_ms));
+    last_ms = now;
+}
 
 // Written before anything else, so there is a trace even if the game dies
 // before keeperfx.log is created.

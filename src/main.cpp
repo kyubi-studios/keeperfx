@@ -272,8 +272,11 @@ void init_keeper(void)
     init_key_to_strings();
     // Load configs which may have per-campaign part, and even be modified within a level
     recheck_all_mod_exist();
+    PSP_PHASE("engine init");
     init_custom_sprites(SPRITE_LAST_LEVEL);
+    PSP_PHASE("custom sprites");
     load_stats_files();
+    PSP_PHASE("config files");
     check_and_auto_fix_stats();
     init_creature_scores();
     init_top_texture_to_cube_table();
@@ -376,6 +379,7 @@ short setup_game(void)
   // Moon phase calculation
   calculate_moon_phase(true,true);
   // Start the sound system
+  PSP_PHASE("before sound");
   if (!init_sound())
     WARNMSG("Sound system disabled.");
   // Note: for some reason, signal handlers must be installed AFTER
@@ -444,6 +448,7 @@ short setup_game(void)
   if (result == 0)
       result = 1;
 
+  PSP_PHASE("startup screens");
   if (result == 1)
   {
       if (flag_is_set(start_params.operation_flags, GOF_SingleLevel) && !(game_flags2 & (GF2_Connect | GF2_Server)))
@@ -457,6 +462,7 @@ short setup_game(void)
       if ( !initial_setup() )
         result = 0;
   }
+  PSP_PHASE("game data files");
 
   if (result == 1)
   {
@@ -464,6 +470,7 @@ short setup_game(void)
     if ( !setup_gui_strings_data() )
       result = 0;
   }
+  PSP_PHASE("settings and strings");
 
   if (result == 1)
   {
@@ -473,6 +480,7 @@ short setup_game(void)
       SetSoundMasterVolume(settings.sound_volume);
       setup_mesh_randomizers();
       setup_stuff();
+      PSP_PHASE("setup_stuff");
   }
 
   return result;

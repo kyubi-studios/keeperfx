@@ -1,6 +1,16 @@
 /* Optional startup tracing on the PSP (-DKFX_PSP_TRACE=ON), see PlatformPSP.cpp. */
 #ifndef KFX_PSP_TRACE_H
 #define KFX_PSP_TRACE_H
+/* Startup phase timing, logged to keeperfx.log on every PSP build. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+void psp_phase(const char* name);
+#ifdef __cplusplus
+}
+#endif
+#define PSP_PHASE(name) psp_phase(name)
+
 #if defined(KFX_PSP_TRACE)
 #ifdef __cplusplus
 extern "C" {

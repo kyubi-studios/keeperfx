@@ -11,7 +11,7 @@ kfx_status("PLATFORM" "Sony PSP (MIPS Allegrex, pspdev)")
 
 set(KFX_PSP_DEPS "${CMAKE_SOURCE_DIR}/deps/psp")
 
-add_compile_definitions("DEBUG=$<IF:$<CONFIG:Debug>,1,0>" _GNU_SOURCE KFX_PSP=1 KFX_NO_OPENGL=1 KFX_NO_NETWORK=1 KFX_FMV_SMACKER=1 KFX_LAZY_SOUND_BANKS=1 KFX_GAME_ON_HEAP=1 KFX_NATURAL_ALIGNMENT=1)
+add_compile_definitions("DEBUG=$<IF:$<CONFIG:Debug>,1,0>" _GNU_SOURCE KFX_PSP=1 KFX_NO_OPENGL=1 KFX_NO_NETWORK=1 KFX_FMV_SMACKER=1 KFX_LAZY_SOUND_BANKS=1 KFX_GAME_ON_HEAP=1 KFX_NATURAL_ALIGNMENT=1 KFX_SPRITE_CACHE=1)
 
 # KFX_NATURAL_ALIGNMENT: most engine structs are declared under #pragma pack(1)
 # to match the original game's memory layout. The PSP's CPU faults on

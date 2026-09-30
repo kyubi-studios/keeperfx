@@ -800,6 +800,7 @@ static TbBool wait_at_frontend(void)
       game.packet_load_enable = 0;
     }
     game.save_game_slot = -1;
+    PSP_PHASE("frontend entry");
     // Make sure campaigns are loaded
     if (!load_campaigns_list(&campaigns_list ,FGrp_Campgn ,"campaigns","campgn_order.txt"))
     {
@@ -812,10 +813,14 @@ static TbBool wait_at_frontend(void)
     {
       WARNMSG("No valid mappack files found");
     }
+#if !defined(KFX_NO_NETWORK)
+    // Multiplayer map packs are only needed with networking (and take seconds on the PSP).
     if (!load_campaigns_list(&mp_mappacks_list,FGrp_MpLevels,"multiplayer mappacks","mp_mappck_order.txt"))
     {
       WARNMSG("No valid multiplayer mappack files found");
     }
+#endif
+    PSP_PHASE("campaign/mappack lists");
     //Set level number and campaign (for single level mode: GOF_SingleLevel)
     if ((start_params.operation_flags & GOF_SingleLevel) != 0)
     {

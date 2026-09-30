@@ -2858,6 +2858,13 @@ FrontendMenuState frontend_set_state(FrontendMenuState nstate)
         frontend_menu_state, menu_state_str(frontend_menu_state),
         nstate, menu_state_str(nstate));
     frontend_menu_state = frontend_setup_state(nstate);
+    if (frontend_menu_state == FeSt_MAIN_MENU) {
+        static TbBool main_menu_reached = false;
+        if (!main_menu_reached) {
+            main_menu_reached = true;
+            PSP_PHASE("main menu");
+        }
+    }
     return frontend_menu_state;
 }
 
