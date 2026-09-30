@@ -1,0 +1,51 @@
+--- a/Core/MIPS/MIPSInt.cpp	2026-05-16 15:32:13.000000000 +0300
++++ b/Core/MIPS/MIPSInt.cpp	2026-09-30 01:14:41.423088605 +0300
+@@ -90,6 +90,18 @@
+ 	return 1;
+ }
+ 
++
++// --- alignment trap reporting (KeeperFX PSP port diagnostics) ---
++#include <cstdio>
++#include <set>
++static void ReportUnaligned(const char *what, u32 addr, u32 pc) {
++	static std::set<u32> seen;
++	if (seen.size() > 4000 || !seen.insert(pc).second)
++		return;
++	fprintf(stderr, "UNALIGNED %s addr=%08x pc=%08x\n", what, addr, pc);
++	fflush(stderr);
++}
++#define CHECK_ALIGN(what, mask) do { if (addr & (mask)) ReportUnaligned(what, addr, PC); } while (0)
+ namespace MIPSInt
+ {
+ 	void Int_Cache(MIPSOpcode op)
+@@ -432,13 +444,13 @@
+ 		switch (op >> 26)
+ 		{
+ 		case 32: R(rt) = SignExtend8ToU32(Memory::Read_U8(addr)); break; //lb
+-		case 33: R(rt) = SignExtend16ToU32(Memory::Read_U16(addr)); break; //lh
+-		case 35: R(rt) = Memory::Read_U32(addr); break; //lw
++		case 33: CHECK_ALIGN("lh",1); R(rt) = SignExtend16ToU32(Memory::Read_U16(addr)); break; //lh
++		case 35: CHECK_ALIGN("lw",3); R(rt) = Memory::Read_U32(addr); break; //lw
+ 		case 36: R(rt) = Memory::Read_U8 (addr); break; //lbu
+-		case 37: R(rt) = Memory::Read_U16(addr); break; //lhu
++		case 37: CHECK_ALIGN("lhu",1); R(rt) = Memory::Read_U16(addr); break; //lhu
+ 		case 40: Memory::Write_U8(R(rt), addr); break; //sb
+-		case 41: Memory::Write_U16(R(rt), addr); break; //sh
+-		case 43: Memory::Write_U32(R(rt), addr); break; //sw
++		case 41: CHECK_ALIGN("sh",1); Memory::Write_U16(R(rt), addr); break; //sh
++		case 43: CHECK_ALIGN("sw",3); Memory::Write_U32(R(rt), addr); break; //sw
+ 
+ 		// When there's an LWL and an LWR together, we should be able to peephole optimize that
+ 		// into a single non-alignment-checking LW.
+@@ -495,8 +507,8 @@
+ 
+ 		switch(op >> 26)
+ 		{
+-		case 49: FI(ft) = Memory::Read_U32(addr); break; //lwc1
+-		case 57: Memory::Write_U32(FI(ft), addr); break; //swc1
++		case 49: CHECK_ALIGN("lwc1",3); FI(ft) = Memory::Read_U32(addr); break; //lwc1
++		case 57: CHECK_ALIGN("swc1",3); Memory::Write_U32(FI(ft), addr); break; //swc1
+ 		default:
+ 			_dbg_assert_msg_(false,"Trying to interpret FPULS instruction that can't be interpreted");
+ 			break;
