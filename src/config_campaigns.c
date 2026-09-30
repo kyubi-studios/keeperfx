@@ -521,6 +521,11 @@ short parse_campaign_common_blocks(struct GameCampaign *campgn,char *buf,long le
             k = atoi(word_buf);
             if (k >= 0)
             {
+#if defined(KFX_PSP)
+                // The original campaign asks for 9999 entries (700 KB), only 10 are ever shown.
+                if (k > 100)
+                    k = 100;
+#endif
                 campgn->hiscore_count = k;
                 n++;
             }

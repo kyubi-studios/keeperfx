@@ -969,6 +969,10 @@ struct SpriteCacheHeader {
     uint32_t zip_mtime;
 };
 
+/* Only one cache file is open at a time; a static stdio buffer avoids a
+ * malloc'd one per file (those were never given back to the heap). */
+static char sprite_cache_iobuf[64 * 1024];
+
 static void sprite_cache_begin(const char *zip_path, const char *kind)
 {
     memset(&sprite_cache, 0, sizeof(sprite_cache));
@@ -984,9 +988,9 @@ static void sprite_cache_begin(const char *zip_path, const char *kind)
 
     FILE *in = fopen(sprite_cache.final_path, "rb");
     if (in != NULL) {
+        setvbuf(in, sprite_cache_iobuf, _IOFBF, sizeof(sprite_cache_iobuf));
         struct SpriteCacheHeader have;
         if (fread(&have, sizeof(have), 1, in) == 1 && memcmp(&have, &want, sizeof(want)) == 0) {
-            setvbuf(in, NULL, _IOFBF, 64 * 1024);
             sprite_cache.in = in;
             return;
         }
@@ -994,7 +998,7 @@ static void sprite_cache_begin(const char *zip_path, const char *kind)
     }
     sprite_cache.out = fopen(sprite_cache.temp_path, "wb");
     if (sprite_cache.out != NULL) {
-        setvbuf(sprite_cache.out, NULL, _IOFBF, 64 * 1024);
+        setvbuf(sprite_cache.out, sprite_cache_iobuf, _IOFBF, sizeof(sprite_cache_iobuf));
         if (fwrite(&want, sizeof(want), 1, sprite_cache.out) != 1)
             sprite_cache.broken = true;
     }

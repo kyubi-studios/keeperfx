@@ -2047,7 +2047,9 @@ static short resolve_startup_config(void)
     // Enable features that require more than 32 megs of memory
     features_enabled |= Ft_HiResCreatr;
     // Enable features that require more than 16 megs of memory
+#if !defined(KFX_PSP) // PSP: the lens buffers (~640 KB) are worth more as heap
     features_enabled |= Ft_EyeLens;
+#endif
     features_enabled |= Ft_HiResVideo;
     features_enabled |= Ft_BigPointer;
     features_enabled |= Ft_AdvAmbSound;

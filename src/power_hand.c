@@ -584,6 +584,9 @@ void draw_power_hand(void)
                 }
             }
             psp_write_status(buf);
+#if defined(KFX_PSP_MEMDEBUG)
+            if (cnt > 600) { static TbBool dumped; if (!dumped) { extern void psp_memdebug_dump(void); psp_memdebug_dump(); dumped = true; } }
+#endif
         }
     }
 #endif

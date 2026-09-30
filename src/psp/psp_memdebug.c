@@ -58,6 +58,10 @@ static void track_del(void *p)
     }
 }
 
+void psp_memdebug_dump(void);
+static void dump_live(void);
+void psp_memdebug_dump(void) { dump_live(); }
+
 static void dump_live(void)
 {
     static struct { void *caller; unsigned bytes, count; } by_caller[CALLER_SLOTS];
@@ -79,10 +83,10 @@ static void dump_live(void)
         by_caller[j].count++;
     }
     char line[128];
-    int n = snprintf(line, sizeof(line), "=== live heap at first failure: %u bytes ===\n", total);
+    int n = snprintf(line, sizeof(line), "=== live heap: %u bytes (dump_live at %p) ===\n", total, (void*)&dump_live);
     log_line(line, n);
     for (int j = 0; j < used; j++) {
-        if (by_caller[j].bytes < 16 * 1024) continue;
+        if (by_caller[j].bytes < 8 * 1024) continue;
         n = snprintf(line, sizeof(line), "live %u x%u from %p\n", by_caller[j].bytes, by_caller[j].count, by_caller[j].caller);
         log_line(line, n);
     }
