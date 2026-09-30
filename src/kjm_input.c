@@ -38,6 +38,8 @@
 #include "config_settings.h"
 #include "config_strings.h"
 #include "frontend.h"
+#include "bflib_guibtns.h"
+#include <SDL3/SDL.h>
 #include "front_input.h"
 #include "frontmenu_ingame_map.h"
 #include "game_legacy.h"
@@ -247,6 +249,82 @@ void poll_controller_mouse_clicks()
     previous_controller_button_state = controller_button_state;
 }
 
+#if defined(KFX_PSP)
+/** True when the pointer rests on an active GUI button (flag set by the last GUI pass). */
+static TbBool pointer_is_over_gui_button(void)
+{
+    for (int gidx = 0; gidx < ACTIVE_BUTTONS_COUNT; gidx++)
+    {
+        const struct GuiButton *gbtn = &active_buttons[gidx];
+        if ((gbtn->flags & (LbBtnF_Active|LbBtnF_MouseOver)) == (LbBtnF_Active|LbBtnF_MouseOver))
+            return true;
+    }
+    return false;
+}
+
+/*
+ * Analog-nub pointer for the PSP, tuned for aiming at small panel icons:
+ * slow near the dead zone, a speed-up only after the nub has been held at
+ * full tilt for a moment, and extra friction while over a button.
+ */
+#define PSP_CURSOR_MIN_SPEED   40.0f   // px/s just past the dead zone
+#define PSP_CURSOR_MAX_SPEED  300.0f   // px/s at full tilt
+#define PSP_CURSOR_BOOST_SPEED 600.0f  // px/s after holding full tilt
+#define PSP_CURSOR_BOOST_DELAY 0.35f   // s at full tilt before speeding up
+#define PSP_CURSOR_BOOST_RAMP  0.5f    // s to reach the boosted speed
+#define PSP_CURSOR_GUI_FRICTION 0.5f   // speed factor over GUI buttons
+
+static void poll_controller_mouse_movement(float nx, float ny)
+{
+    static float accum_x, accum_y;
+    static float full_tilt_time;
+    static Uint64 last_ticks;
+    const Uint64 now = SDL_GetTicks();
+    float dt = (last_ticks == 0) ? 0.0f : (float)(now - last_ticks) / 1000.0f;
+    last_ticks = now;
+    if (dt > 0.1f)
+        dt = 0.1f; // don't jump after a stall
+
+    float mag = sqrtf(nx * nx + ny * ny);
+    if (mag <= 0.0f)
+    {
+        full_tilt_time = 0.0f;
+        accum_x = accum_y = 0.0f;
+        return;
+    }
+    nx /= mag;
+    ny /= mag;
+    if (mag > 1.0f)
+        mag = 1.0f;
+
+    // Quadratic response: most of the nub's travel is for precise aiming.
+    float speed = PSP_CURSOR_MIN_SPEED + (PSP_CURSOR_MAX_SPEED - PSP_CURSOR_MIN_SPEED) * mag * mag;
+    if (mag > 0.95f)
+    {
+        full_tilt_time += dt;
+        float boost = (full_tilt_time - PSP_CURSOR_BOOST_DELAY) / PSP_CURSOR_BOOST_RAMP;
+        if (boost > 0.0f)
+            speed += (PSP_CURSOR_BOOST_SPEED - PSP_CURSOR_MAX_SPEED) * min(boost, 1.0f);
+    }
+    else
+    {
+        full_tilt_time = 0.0f;
+    }
+    if (pointer_is_over_gui_button())
+        speed *= PSP_CURSOR_GUI_FRICTION;
+
+    accum_x += nx * speed * dt;
+    accum_y += ny * speed * dt;
+    int dx = (int)accum_x;
+    int dy = (int)accum_y;
+    accum_x -= dx;
+    accum_y -= dy;
+    if (dx != 0 || dy != 0) {
+        struct TbPoint mouseDelta = { dx, dy };
+        mouseControl(MActn_MOUSEMOVE, &mouseDelta);
+    }
+}
+#else
 #define SECONDS_TO_CROSS   20.0f
 static void poll_controller_mouse_movement(float nx, float ny)
 {
@@ -281,6 +359,7 @@ static void poll_controller_mouse_movement(float nx, float ny)
         mouseControl(MActn_MOUSEMOVE, &mouseDelta);
     }
 }
+#endif
 
 void update_controller_inputs()
 {

@@ -217,7 +217,13 @@ float cbtn_axis_value(TbControllerButtons btn)
         return 0.0f;
     }
 
+#if defined(KFX_PSP)
+    // The PSP nub rests well inside +-5500 but a 10000 dead zone makes fine
+    // cursor moves impossible; values are rescaled so they start from 0.
+    const float deadzone = 5500.0f;
+#else
     const float deadzone = 10000.0f;
+#endif
     const float max_axis = 32767.0f;
 
     float value = 0.0f;
@@ -227,7 +233,11 @@ float cbtn_axis_value(TbControllerButtons btn)
         if (directional <= deadzone) {
             return 0.0f;
         }
+#if defined(KFX_PSP)
+        float normalized = (directional - deadzone) / (max_axis - deadzone);
+#else
         float normalized = directional / max_axis;
+#endif
         if (normalized > 1.0f) {
             normalized = 1.0f;
         }
