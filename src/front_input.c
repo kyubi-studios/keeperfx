@@ -1359,6 +1359,7 @@ static short get_status_panel_keyboard_action_inputs(void)
     fake_button_click(BID_CREATR_TAB);
   }
   
+#if !defined(KFX_PSP) // PSP: L/R share these buttons and rotate the camera here instead
   if(is_game_key_pressed(Gkey_NextInstance, true, false))
   {
     go_to_adjacent_menu_tab(1);
@@ -1366,7 +1367,8 @@ static short get_status_panel_keyboard_action_inputs(void)
   if(is_game_key_pressed(Gkey_PrevInstance, true, false))
   {
       go_to_adjacent_menu_tab(-1);
-  }   
+  }
+#endif
 
   return false;
 }
