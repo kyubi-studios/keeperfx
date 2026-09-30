@@ -419,6 +419,15 @@ TbBool process_dungeon_control_packet_dungeon_control(NetUserId user)
         if (ustate->cursor_button_down != 0)
         {
             TbBool direct_control_target = !thing_target_action && (player->thing_under_hand != 0) && (ustate->input_crtr_control != 0);
+#if defined(KFX_PSP)
+            // PSP: the select button (cross) also drops what the hand holds,
+            // the way it casts powers; right click is still the cancel/back key.
+            if (!thing_target_action && !power_hand_is_empty(player) && (!ustate->one_click_lock_cursor)
+                && ((pckt->control_flags & PCtr_MapCoordsValid) != 0)
+                && dump_first_held_thing_on_map(player->id_number, stl_x, stl_y, 1)) {
+                unset_packet_control(pckt, PCtr_LBtnRelease);
+            } else
+#endif
             if (direct_control_target && (dungeon->things_in_hand[0] != player->thing_under_hand)) {
                 thing = get_creature_near_for_controlling(player->id_number, x, y);
                 if (!thing_is_invalid(thing))
