@@ -93,7 +93,13 @@ static voidpf ZCALLBACK fopen_file_func(voidpf opaque, const char* filename, int
         mode_fopen = "wb";
 
     if ((filename!=NULL) && (mode_fopen != NULL))
+    {
         file = fopen(filename, mode_fopen);
+        /* KeeperFX PSP: minizip issues many small reads (zip directory,
+         * headers); a bigger buffer saves slow memory stick round trips. */
+        if (file != NULL)
+            setvbuf((FILE*)file, NULL, _IOFBF, 32 * 1024);
+    }
     return file;
 }
 
@@ -111,7 +117,12 @@ static voidpf ZCALLBACK fopen64_file_func(voidpf opaque, const void* filename, i
         mode_fopen = "wb";
 
     if ((filename!=NULL) && (mode_fopen != NULL))
+    {
         file = FOPEN_FUNC((const char*)filename, mode_fopen);
+        /* KeeperFX PSP: see fopen_file_func. */
+        if (file != NULL)
+            setvbuf(file, NULL, _IOFBF, 32 * 1024);
+    }
     return file;
 }
 

@@ -182,8 +182,137 @@ TbBool skip_conf_spaces(const char *buf, int32_t *pos, long buflen)
  * Starts at position given with pos, and sets it to position of block data.
  * @return Returns 1 if the block is found, -1 if buffer exceeded.
  */
+#if defined(KFX_PSP)
+/*
+ * Block index for find_conf_block(). Every lookup used to rescan the file
+ * from the start, so parsing a config with N blocks cost N full passes;
+ * that alone took tens of seconds on the PSP. The first lookup in a buffer
+ * records every "[name]" header (position after the header line and the
+ * line number there, exactly as the scan below would leave them); later
+ * lookups in the same buffer are answered from that list.
+ */
+struct ConfBlockIndexEntry {
+    int32_t name_pos;
+    int32_t name_len;
+    int32_t pos_after;
+    int32_t line_after;
+};
+
+static struct {
+    const char *buf;
+    long len;
+    uint32_t fingerprint;
+    struct ConfBlockIndexEntry *entries;
+    int count;
+    int capacity;
+    int32_t last_line;
+} conf_block_index;
+
+/* Identifies the buffer contents, so a new file loaded at the same address isn't mistaken for the old one. */
+static uint32_t conf_buffer_fingerprint(const char *buf, long len)
+{
+    uint32_t h = 2166136261u ^ (uint32_t)len;
+    const long n = (len < 256) ? len : 256;
+    for (long i = 0; i < n; i++)
+        h = (h ^ (unsigned char)buf[i]) * 16777619u;
+    for (long i = len - n; i < len; i++)
+        h = (h ^ (unsigned char)buf[i]) * 16777619u;
+    return h;
+}
+
+static TbBool conf_block_index_build(const char *buf, long buflen)
+{
+    conf_block_index.buf = NULL;
+    conf_block_index.count = 0;
+    int32_t pos = 0;
+    text_line_number = 1;
+    while (pos < buflen)
+    {
+        if (!skip_conf_spaces(buf, &pos, buflen))
+            break;
+        if (buf[pos] != '[')
+        {
+            skip_conf_to_next_line(buf, &pos, buflen);
+            continue;
+        }
+        pos++;
+        if (!skip_conf_spaces(buf, &pos, buflen))
+            break;
+        const int32_t name_pos = pos;
+        while (pos < buflen)
+        {
+            const unsigned char c = (unsigned char)buf[pos];
+            if ((c == ']') || (c == ' ') || (c == '\t') || (c == '\r') || (c == '\n') || (c == 26) || (c < 7))
+                break;
+            pos++;
+        }
+        const int32_t name_len = pos - name_pos;
+        if (!skip_conf_spaces(buf, &pos, buflen))
+            break;
+        if ((buf[pos] != ']') || (name_len == 0))
+        {
+            skip_conf_to_next_line(buf, &pos, buflen);
+            continue;
+        }
+        skip_conf_to_next_line(buf, &pos, buflen);
+        if (conf_block_index.count == conf_block_index.capacity)
+        {
+            int ncap = conf_block_index.capacity ? conf_block_index.capacity * 2 : 64;
+            struct ConfBlockIndexEntry *n = realloc(conf_block_index.entries, ncap * sizeof(*n));
+            if (n == NULL)
+                return false;
+            conf_block_index.entries = n;
+            conf_block_index.capacity = ncap;
+        }
+        struct ConfBlockIndexEntry *e = &conf_block_index.entries[conf_block_index.count++];
+        e->name_pos = name_pos;
+        e->name_len = name_len;
+        e->pos_after = pos;
+        e->line_after = text_line_number;
+    }
+    conf_block_index.last_line = text_line_number;
+    conf_block_index.buf = buf;
+    conf_block_index.len = buflen;
+    conf_block_index.fingerprint = conf_buffer_fingerprint(buf, buflen);
+    return true;
+}
+
+static short find_conf_block_indexed(const char *buf, int32_t *pos, long buflen, const char *blockname)
+{
+    if ((conf_block_index.buf != buf) || (conf_block_index.len != buflen) ||
+        (conf_block_index.fingerprint != conf_buffer_fingerprint(buf, buflen)))
+    {
+        if (!conf_block_index_build(buf, buflen))
+            return 0; // no memory: caller falls back to scanning
+    }
+    const int blname_len = strlen(blockname);
+    for (int i = 0; i < conf_block_index.count; i++)
+    {
+        const struct ConfBlockIndexEntry *e = &conf_block_index.entries[i];
+        if ((e->name_len == blname_len) && (strncasecmp(&buf[e->name_pos], blockname, blname_len) == 0))
+        {
+            *pos = e->pos_after;
+            text_line_number = e->line_after;
+            return 1;
+        }
+    }
+    *pos = buflen;
+    text_line_number = conf_block_index.last_line;
+    return -1;
+}
+#endif
+
 short find_conf_block(const char *buf,int32_t *pos,long buflen,const char *blockname)
 {
+#if defined(KFX_PSP)
+  // Nearly every caller searches from the start of the buffer.
+  if (*pos == 0)
+  {
+    short r = find_conf_block_indexed(buf, pos, buflen, blockname);
+    if (r != 0)
+      return r;
+  }
+#endif
   text_line_number = 1;
   int blname_len = strlen(blockname);
   while ((*pos)+blname_len+2 < buflen)

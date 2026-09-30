@@ -1017,6 +1017,11 @@ static void sprite_cache_end(TbBool ok)
     }
 }
 
+static TbBool sprite_cache_replaying(void)
+{
+    return sprite_cache.in != NULL;
+}
+
 /** Replays one cached sprite. @return 1 ok, 0 decoding had failed, -1 no usable cache entry. */
 static int sprite_cache_read(int *w, int *h, unsigned char **data, size_t *len)
 {
@@ -1698,12 +1703,20 @@ collect_sprites(const char *path, unzFile zip, const char *blender_scene, struct
                     WARNLOG("Invalid sprite file record in '%s/sprites.json'", path);
                     return 1;
                 }
-                if (fastUnzLocateFile(zip, name, 0))
+#if defined(KFX_SPRITE_CACHE)
+                // A replayed cache implies every PNG was found when it was
+                // recorded, and the pixels come from the cache: skip the zip
+                // seek/open per frame, which is slow on a memory stick.
+                TbBool from_cache = sprite_cache_replaying();
+#else
+                TbBool from_cache = false;
+#endif
+                if (!from_cache && fastUnzLocateFile(zip, name, 0))
                 {
                     WARNLOG("Png '%s' not found in '%s'", name, path);
                     return 1;
                 }
-                if (UNZ_OK != unzOpenCurrentFile(zip))
+                if (!from_cache && UNZ_OK != unzOpenCurrentFile(zip))
                 {
                     WARNLOG("Unable to open '%s/%s'", path, name);
                     return 1;
@@ -1718,7 +1731,21 @@ collect_sprites(const char *path, unzFile zip, const char *blender_scene, struct
                 fprintf(stderr, "F:%s/%s\n", path, name);
                 fprintf(stderr, "A:%u\n", (unsigned)SDL_GetTicks());
 #endif
-                if (!read_png_data(zip, path, context, name, is_fp, node, itm))
+                int png_ok = read_png_data(zip, path, context, name, is_fp, node, itm);
+#if defined(KFX_SPRITE_CACHE)
+                if (!png_ok && from_cache && !sprite_cache_replaying())
+                {
+                    // The cache went bad on this very frame: decode it from the zip instead.
+                    from_cache = false;
+                    if (fastUnzLocateFile(zip, name, 0) || UNZ_OK != unzOpenCurrentFile(zip))
+                    {
+                        WARNLOG("Png '%s' not found in '%s'", name, path);
+                        return 1;
+                    }
+                    png_ok = read_png_data(zip, path, context, name, is_fp, node, itm);
+                }
+#endif
+                if (!png_ok)
                 {
                     // Reverting possible changes
                     *context->id_ptr = store_p;
@@ -1727,14 +1754,15 @@ collect_sprites(const char *path, unzFile zip, const char *blender_scene, struct
                     if (store_ksp)
                         context->ksp_first->FramesCount = store_ksp_fc;
 
-                    unzCloseCurrentFile(zip);
+                    if (!from_cache)
+                        unzCloseCurrentFile(zip);
                     WARNLOG("Unable to read '%s/%s'", path, name);
                     return 1;
                 }
 #ifdef INNER
                 fprintf(stderr, "B:%u\n", (unsigned)SDL_GetTicks());
 #endif
-                if (UNZ_OK != unzCloseCurrentFile(zip))
+                if (!from_cache && UNZ_OK != unzCloseCurrentFile(zip))
                 {
                     return 1;
                 }

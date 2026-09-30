@@ -440,7 +440,9 @@ static TbBool load_trapdoor_config_file(const char *fname, unsigned short flags)
 
     if ((flags & CnfLd_AcceptPartial) == 0)
     {
-        for (int i = 0; i < TRAPDOOR_TYPES_MAX; i++)
+        // Indexed by object model: bound by the array's own size (used to be
+        // TRAPDOOR_TYPES_MAX, which only matched while both limits were 2000).
+        for (int i = 0; i < OBJECT_TYPES_MAX; i++)
         {
             game.conf.object_conf.object_to_door_or_trap[i] = 0;
         }
