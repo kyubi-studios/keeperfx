@@ -295,6 +295,39 @@ Her madde: **belirti → kök neden → çözüm**. Sıra, karşılaşılma sır
   - `keeperfx.log`: ana menü, seviye başı ve her 30 sn'de heap kullanımı ve en
     büyük serbest blok (`PSP memory (...)` satırları).
 
+### Sorun 21 — Önbelleğe rağmen gerçek PSP'de sprite yüklemesi 43 sn
+
+- Ölçüm (gerçek PSP, ikinci açılış): özel sprite'lar 43.3 sn, yapılandırma
+  15.5 sn, kampanya listeleri 10.9 sn. Önbellek dosyaları kullanılmıştı.
+- Kök neden: Önbellekten okurken bile her sprite karesi için zip içinde dosya
+  aranıyor/açılıyor/kapatılıyordu; 3420 kare × hafıza kartı erişimi. Emülatör
+  hafıza kartı gecikmesini taklit etmediği için burada görünmedi.
+- Çözüm: Önbellekten okunurken zip'e hiç dokunulmuyor; önbellek tam o karede
+  bozulursa o kare zip'ten çözülüyor. minizip dosya tamponu 32 KB.
+
+### Sorun 22 — Yapılandırma ayrıştırması yavaş
+
+- Kök neden: `find_conf_block` her blok için dosyayı baştan tarıyor
+  (N blok → N tam tarama).
+- Çözüm (PSP): Tampon başına bir kez oluşturulan blok dizini. 4000'den fazla
+  aramada eski taramayla birebir aynı sonuç (konum, satır numarası) doğrulandı.
+  Emülatörde yapılandırma süresi açılışta 5.5 → 4.0 sn, seviye başında
+  6.3 → 4.8 sn. Kalan süre alan ayrıştırmasında; profil çıkarmak için
+  `-pg`/`libpspprof` denendi ama PPSSPP'de örnek toplanmadı.
+
+### Sorun 23 — Tuzak/kapı tablosunda dizi taşması
+
+- Derleyici uyarısı (`-Waggressive-loop-optimizations`) ile bulundu:
+  `object_to_door_or_trap[]` nesne sayısı kadar, onu temizleyen döngü tuzak
+  sayısı kadar dönüyordu. Masaüstünde ikisi de 2000 olduğu için zararsızdı;
+  PSP'de nesne sınırı 512 olunca sonraki yapılandırma verisinin üzerine sıfır
+  yazıyordu. Döngü dizinin kendi boyutuyla sınırlandı.
+
+### Not — Yaratık bırakma
+
+- DK'de elindeki yaratığı bırakmak sağ tıktır (PSP'de △). Oda kurma aracı
+  seçiliyken (yeşil küp) ilk sağ tık aracı kapatır, ikincisi yaratığı bırakır.
+
 ---
 
 ## 5. Test yöntemi
@@ -311,8 +344,9 @@ Her madde: **belirti → kök neden → çözüm**. Sıra, karşılaşılma sır
 
 ## 6. Bilinen sınırlamalar ve açık konular
 
-- Gerçek PSP emülatörden ~4-5 kat yavaş. Seviye yüklemesinde yapılandırma
-  dosyalarının ayrıştırılması 29.5 sn sürdü; bu sıradaki darboğaz.
+- Gerçek PSP emülatörden ~3-5 kat yavaş; hafıza kartı erişimleri emülatörde
+  görünmeyen ek gecikme yaratıyor. Süreler gerçek cihazda ölçülerek iyileştiriliyor
+  (`keeperfx.log`'daki `PSP load:` satırları).
 - Bellek payı gerçek cihazda henüz ölçülmedi; son sürümdeki `PSP memory` log satırları bunu verecek.
 - Çok oyunculu mod yok; en büyük harita 85x85; harita başına en fazla 254
   yaratık (log'daki `MAPCREATURELIMIT` uyarıları bundan).
