@@ -18,6 +18,8 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdarg>
+#include <cstdlib>
+#include <malloc.h>
 #include "post_inc.h"
 
 /* Take all user memory for the newlib heap except 4 MB kept back for thread
@@ -100,6 +102,27 @@ extern "C" void psp_phase(const char* name)
     last_ms = now;
 }
 
+/** Largest single allocation currently possible, found by bisection. */
+static unsigned int largest_heap_block_kb(void)
+{
+    unsigned int lo = 0, hi = 64 * 1024;
+    while (lo < hi) {
+        unsigned int mid = (lo + hi + 1) / 2;
+        // volatile + a write, or GCC folds the malloc/free pair into "success".
+        unsigned char* volatile p = (unsigned char*)malloc((size_t)mid * 1024);
+        if (p != NULL) { p[0] = 0; free(p); lo = mid; } else { hi = mid - 1; }
+    }
+    return lo;
+}
+
+extern "C" void psp_log_memory(const char* where)
+{
+    struct mallinfo mi = mallinfo();
+    LbJustLog("PSP memory (%s): heap used %u KB, largest free block %u KB, system free %u KB\n",
+        where, (unsigned)(mi.uordblks / 1024), largest_heap_block_kb(),
+        (unsigned)(sceKernelTotalFreeMemSize() / 1024));
+}
+
 // Written before anything else, so there is a trace even if the game dies
 // before keeperfx.log is created.
 static void write_boot_report(void)
@@ -108,12 +131,13 @@ static void write_boot_report(void)
     if (f == NULL)
         return;
     fprintf(f, "KeeperFX PSP boot\n");
-    fprintf(f, "free memory: %u KB total, %u KB largest block\n",
+    fprintf(f, "system memory outside the heap: %u KB total, %u KB largest block\n",
         (unsigned)(sceKernelTotalFreeMemSize() / 1024), (unsigned)(sceKernelMaxFreeMemSize() / 1024));
 #if defined(KFX_GAME_ON_HEAP)
     fprintf(f, "game state: %p (%u KB)\n", (void*)kfx_game_ptr, (unsigned)(sizeof(*kfx_game_ptr) / 1024));
 #endif
     fclose(f);
+    // The heap figures come from psp_log_memory() in keeperfx.log.
 }
 
 int main(int argc, char *argv[])

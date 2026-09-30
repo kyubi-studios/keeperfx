@@ -2863,6 +2863,9 @@ FrontendMenuState frontend_set_state(FrontendMenuState nstate)
         if (!main_menu_reached) {
             main_menu_reached = true;
             PSP_PHASE("main menu");
+#if defined(KFX_PSP)
+            psp_log_memory("main menu");
+#endif
         }
     }
     return frontend_menu_state;

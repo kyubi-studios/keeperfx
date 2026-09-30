@@ -7466,11 +7466,78 @@ static unsigned short get_thing_shade(struct Thing* thing)
     return shval;
 }
 
+#if defined(KFX_KEEPSPRITE_BUDGET)
+/*
+ * Frames of creature.jty are loaded on demand and, on desktop, kept forever
+ * (up to the whole 13 MB file). With a budget, the least recently drawn frames
+ * are freed again after a frame has been presented, when nothing references
+ * them any more; they're simply reloaded if needed later.
+ */
+static uint32_t keepsprite_size[KEEPSPRITE_LENGTH];
+static uint32_t keepsprite_last_use[KEEPSPRITE_LENGTH];
+static uint32_t keepsprite_use_clock;
+static size_t keepsprite_loaded_bytes;
+
+static void keepsprite_free_frame(long i)
+{
+    free(sprite_heap_handle[i]);
+    sprite_heap_handle[i] = NULL;
+    keepsprite[i] = NULL;
+    keepsprite_loaded_bytes -= keepsprite_size[i];
+    keepsprite_size[i] = 0;
+}
+
+void keepersprite_heap_trim(void)
+{
+    keepsprite_use_clock++;
+    if (keepsprite_loaded_bytes <= KFX_KEEPSPRITE_BUDGET)
+        return;
+    // Evict down to 3/4 of the budget so this doesn't run every frame.
+    const size_t target = KFX_KEEPSPRITE_BUDGET / 4 * 3;
+    while (keepsprite_loaded_bytes > target)
+    {
+        long oldest = -1;
+        for (long i = 0; i < KEEPSPRITE_LENGTH; i++)
+        {
+            // Never evict what was drawn in the frame just presented.
+            if (sprite_heap_handle[i] == NULL || keepsprite_last_use[i] + 1 >= keepsprite_use_clock)
+                continue;
+            if (oldest < 0 || keepsprite_last_use[i] < keepsprite_last_use[oldest])
+                oldest = i;
+        }
+        if (oldest < 0)
+            break;
+        // Free every frame last used at that same time (they're loaded per animation).
+        const uint32_t stamp = keepsprite_last_use[oldest];
+        for (long i = 0; i < KEEPSPRITE_LENGTH; i++)
+        {
+            if (sprite_heap_handle[i] != NULL && keepsprite_last_use[i] == stamp)
+                keepsprite_free_frame(i);
+        }
+    }
+}
+
+void keepersprite_heap_free_all(void)
+{
+    for (long i = 0; i < KEEPSPRITE_LENGTH; i++)
+    {
+        if (sprite_heap_handle[i] != NULL)
+            keepsprite_free_frame(i);
+    }
+}
+#endif
+
 static long load_single_frame(TbSpriteData *data_ptr, unsigned short kspr_idx)
 {
     long nlength;
     nlength = creature_table[kspr_idx+1].DataOffset - creature_table[kspr_idx].DataOffset;
     *data_ptr = he_alloc(nlength);
+#if defined(KFX_KEEPSPRITE_BUDGET)
+    if (*data_ptr == NULL)
+        return 0;
+    keepsprite_size[kspr_idx] = nlength;
+    keepsprite_loaded_bytes += nlength;
+#endif
 
     LbFileSeek(jty_file_handle, creature_table[kspr_idx].DataOffset, 0);
     LbFileRead(jty_file_handle, *data_ptr, nlength);
@@ -7493,6 +7560,9 @@ static long load_keepersprite_if_needed(unsigned short kspr_idx)
     for (frame_num=0; frame_num < frame_count; frame_num++)
     {
         TbSpriteData *sprite_data_ptr = &sprite_heap_handle[kspr_idx+frame_num];
+#if defined(KFX_KEEPSPRITE_BUDGET)
+        keepsprite_last_use[kspr_idx+frame_num] = keepsprite_use_clock;
+#endif
         if ((*sprite_data_ptr) == NULL)
         {
             if (!load_single_frame(sprite_data_ptr, kspr_idx+frame_num))

@@ -1111,7 +1111,7 @@ extern "C" void SetSamplePitch(SoundEmitterID emit_id, SoundSmplTblID smptbl_id,
 
 #if defined(KFX_LAZY_SOUND_BANKS)
 // Budget for PCM kept resident in OpenAL from the effect/speech banks.
-constexpr size_t LAZY_BANK_BUDGET = 3 * 1024 * 1024;
+constexpr size_t LAZY_BANK_BUDGET = 1536 * 1024;
 unsigned long g_lazy_clock = 0;
 
 // Drop a sample's PCM unless a source is still playing it.
@@ -1414,6 +1414,27 @@ extern "C" TbBool play_streamed_sample(const char* fname, SoundVolume volume)
 	if (!g_mixer || !g_speech_track) {
 		return false;
 	}
+#if defined(KFX_PSP)
+	// Stream from the memory stick: predecoding a campaign speech MP3 takes
+	// megabytes of PCM, more than the PSP has free.
+	SDL_IOStream* speech_io = SDL_IOFromFile(fname, "rb");
+	if (!speech_io || !MIX_SetTrackIOStream(g_speech_track, speech_io, true)) {
+		ERRORLOG("Cannot load \"%s\": %s", fname, SDL_GetError());
+		return false;
+	}
+	MIX_SetTrackGain(g_speech_track, float(volume) / FULL_LOUDNESS);
+	if (!MIX_PlayTrack(g_speech_track, 0)) {
+		ERRORLOG("Cannot play \"%s\": %s", fname, SDL_GetError());
+		return false;
+	}
+	{
+		std::lock_guard<std::mutex> guard(g_mix_mutex);
+		if (MIX_Audio* old_sample = std::exchange(g_streamed_sample, (MIX_Audio*)nullptr)) {
+			MIX_DestroyAudio(old_sample);
+		}
+	}
+	return true;
+#endif
 	// Predecode speech so short samples start with no I/O latency.
 	MIX_Audio* sample = MIX_LoadAudio(g_mixer, fname, true);
 	if (sample == nullptr) {

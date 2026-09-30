@@ -265,6 +265,9 @@ static TbBool init_level(void)
     game.manufactr_tooltip = 0;
     reset_postal_instance_cache();
     JUSTMSG("Started level %u from %s", get_selected_level_number(), campaign.name);
+#if defined(KFX_PSP)
+    psp_log_memory("level start");
+#endif
 
     api_event("GAME_STARTED");
     return true;

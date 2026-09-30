@@ -59,3 +59,4 @@ debug.log
 /out-psp/
 /out-psp-dbg/
 /out-psp-trace/
+/out-psp-evict/

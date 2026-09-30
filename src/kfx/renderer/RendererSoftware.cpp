@@ -11,6 +11,7 @@
 #include "kfx/renderer/RenderTaskProducerRegistry.h"
 #include "kfx/renderer/RendererFrameCounter.h"
 #include "bflib_basics.h"      // LbJustLog
+#include "engine_render.h"     // keepersprite_heap_trim
 #include "bflib_mouse.h"       // LbMouseOnBeginSwap/EndSwap (submits the cursor sprite around present)
 #include <SDL3_image/SDL_image.h> // IMG_SavePNG (screenshots)
 #include "post_inc.h"
@@ -374,6 +375,21 @@ void RendererSoftware::PresentFrame()
     SDL_RenderTexture(m_renderer, m_texture, NULL, (pw > 0 && ph > 0) ? &dst : NULL);
     SDL_RenderPresent(m_renderer);
     LbMouseOnEndSwap();
+#if defined(KFX_KEEPSPRITE_BUDGET)
+    // Nothing references this frame's sprite data any more.
+    keepersprite_heap_trim();
+#endif
+#if defined(KFX_PSP)
+    {
+        static Uint64 s_mem_log_next = 0;
+        const Uint64 mem_now = SDL_GetTicks();
+        if (mem_now >= s_mem_log_next) {
+            if (s_mem_log_next != 0)
+                psp_log_memory("periodic");
+            s_mem_log_next = mem_now + 30000;
+        }
+    }
+#endif
 #if defined(KFX_PSP_PERFLOG)
     // Presented frames per 5 s, for tuning on the PSP.
     static Uint64 s_perf_start = 0;

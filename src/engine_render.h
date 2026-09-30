@@ -107,6 +107,11 @@ struct stripey_line {
 
 extern struct stripey_line colored_stripey_lines[];
 extern unsigned char poly_pool[POLY_POOL_SIZE];
+#if defined(KFX_KEEPSPRITE_BUDGET)
+/** Frees least recently drawn creature.jty frames above the budget; call between frames. */
+void keepersprite_heap_trim(void);
+void keepersprite_heap_free_all(void);
+#endif
 extern unsigned char *poly_pool_end;
 extern long cells_away;
 extern float hud_scale;

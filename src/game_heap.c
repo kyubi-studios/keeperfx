@@ -64,6 +64,10 @@ void reset_heap_manager(void)
 {
     long i;
     SYNCDBG(8,"Starting");
+#if defined(KFX_KEEPSPRITE_BUDGET)
+    // Frames are malloc'd; release them instead of just forgetting them.
+    keepersprite_heap_free_all();
+#endif
     LbFileClose(jty_file_handle);
     jty_file_handle = NULL;
     for (i=0; i < KEEPSPRITE_LENGTH; i++)

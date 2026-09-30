@@ -6,6 +6,7 @@
 extern "C" {
 #endif
 void psp_phase(const char* name);
+void psp_log_memory(const char* where);
 #ifdef __cplusplus
 }
 #endif
