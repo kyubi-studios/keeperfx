@@ -56,3 +56,8 @@ TbBool network_is_active(void)
 #endif
 /******************************************************************************/
 /******************************************************************************/
+
+#include <stddef.h>
+/* Subtile coordinates overlay 'val' (see KFX_STL_PACKED in globals.h). */
+_Static_assert(offsetof(struct Coord3d, x.stl.num) == offsetof(struct Coord3d, x.val) + 1, "Coord3d stl.num must start at byte 1");
+_Static_assert(offsetof(struct Coord2d, y.stl.num) == offsetof(struct Coord2d, y.val) + 1, "Coord2d stl.num must start at byte 1");

@@ -60,6 +60,7 @@
 #include "frontend.h"
 #include "gui_draw.h"
 #include "engine_render.h"
+#include "map_data.h"
 #include "sounds.h"
 #include "game_legacy.h"
 #include "sprites.h"
@@ -534,6 +535,21 @@ void remove_thing_from_limbo(struct Thing *thing)
     place_thing_in_mapwho(thing);
 }
 
+#if defined(KFX_PSP)
+static long psp_first_x = -1, psp_first_y = -1;
+static unsigned long count_blocks_with_things(void)
+{
+    unsigned long n = 0;
+    for (MapSubtlCoord y = 0; y < game.map_subtiles_y; y++)
+        for (MapSubtlCoord x = 0; x < game.map_subtiles_x; x++)
+            if (get_mapwho_thing_index(get_map_block_at(x, y)) != 0) {
+                if (n == 0) { psp_first_x = x; psp_first_y = y; }
+                n++;
+            }
+    return n;
+}
+#endif
+
 void draw_power_hand(void)
 {
     SYNCDBG(17,"Starting");
@@ -550,6 +566,7 @@ void draw_power_hand(void)
         static int cnt;
         if ((cnt++ % 90) == 0) {
             extern size_t keepersprite_loaded_bytes(void);
+            extern unsigned long psp_poly_drops, psp_poly_peak;
             const struct TbSprite *s = NULL; int32_t px = 0, py = 0; int u = 0;
             TbBool ok = LbMouseGetActivePointerSprite(&s, &px, &py, &u);
             struct Thing *htng = thing_get(player->hand_thing_idx);
@@ -558,7 +575,7 @@ void draw_power_hand(void)
                 "turn %lu mouse %d,%d pointer ok=%d spr=%p at %d,%d\n"
                 "hand idx=%d exists=%d anim=%d frame=%d rflags=0x%x pos=%d,%d,%d\n"
                 "under=%d ws=%d vt=%d pcs=%d scs=%d dnu=%d sms=%d busy=%lu instance=%d\n"
-                "keepsprites %lu bytes",
+                "keepsprites %lu bytes, poly pool peak %lu of %lu, dropped %lu",
                 (unsigned long)get_gameturn(), (int)GetMouseX(), (int)GetMouseY(), (int)ok, (const void*)s, (int)px, (int)py,
                 (int)player->hand_thing_idx, (int)thing_exists(htng), thing_exists(htng) ? (int)htng->anim_sprite : -1,
                 thing_exists(htng) ? (int)htng->current_frame : -1, thing_exists(htng) ? (unsigned)htng->rendering_flags : 0,
@@ -566,7 +583,7 @@ void draw_power_hand(void)
                 (int)local_state.local_thing_under_hand, (int)player->work_state, (int)player->view_type,
                 (int)ustate->primary_cursor_state, (int)ustate->secondary_cursor_state, (int)local_state.display_needs_update,
                 (int)game.small_map_state, (unsigned long)player->hand_busy_until_turn, (int)player->instance_num,
-                (unsigned long)keepersprite_loaded_bytes());
+                (unsigned long)keepersprite_loaded_bytes(), psp_poly_peak, (unsigned long)POLY_POOL_SIZE, psp_poly_drops);
             {
                 struct Dungeon *dg = get_players_dungeon(player);
                 struct Thing *imp = thing_get(dg->digger_list_start);
@@ -575,13 +592,26 @@ void draw_power_hand(void)
                     int32_t di = 0; const unsigned char *dd = NULL; int sw = 0, sh = 0; const struct KeeperSprite *ks = NULL;
                     TbBool rok = resolve_keepersprite_draw_data(imp->anim_sprite, imp->move_angle_xy, imp->current_frame, &di, &dd, &sw, &sh, &ks);
                     snprintf(buf + n, sizeof(buf) - n,
-                        "\nimp idx=%d anim=%d frame=%d rflags=0x%x alloc=0x%x pos=%d,%d,%d resolve=%d data=%p size=%dx%d drawidx=%ld",
+                        "\nimp idx=%d anim=%d frame=%d rflags=0x%x alloc=0x%x pos=%d,%d,%d resolve=%d data=%p size=%dx%d drawidx=%ld mapwho=%d next=%d mapsz=%dx%d blk=%p rev=0x%x stlnum=%d,%d first_with_things=%ld,%ld",
                         (int)imp->index, (int)imp->anim_sprite, (int)imp->current_frame, (unsigned)imp->rendering_flags,
                         (unsigned)imp->alloc_flags, (int)imp->mappos.x.val, (int)imp->mappos.y.val, (int)imp->mappos.z.val,
-                        (int)rok, (const void*)dd, sw, sh, (long)di);
+                        (int)rok, (const void*)dd, sw, sh, (long)di,
+                        (int)get_mapwho_thing_index(get_map_block_at(imp->mappos.x.stl.num, imp->mappos.y.stl.num)), (int)imp->next_on_mapblk,
+                        (int)game.map_subtiles_x, (int)game.map_subtiles_y,
+                        (void*)get_map_block_at(imp->mappos.x.stl.num, imp->mappos.y.stl.num),
+                        (unsigned)get_map_block_at(imp->mappos.x.stl.num, imp->mappos.y.stl.num)->revealed,
+                        (int)imp->mappos.x.stl.num, (int)imp->mappos.y.stl.num, psp_first_x, psp_first_y);
                 } else {
                     snprintf(buf + n, sizeof(buf) - n, "\nno imp (digger list %d)", (int)dg->digger_list_start);
                 }
+            }
+            {
+                extern unsigned long psp_ks[16]; extern long psp_minx, psp_maxx, psp_miny, psp_maxy;
+                size_t n = strlen(buf);
+                snprintf(buf + n, sizeof(buf) - n, "\nsprites since last: jonty=%lu process=%lu heapfail=%lu invalid=%lu unalloc=%lu submitted=%lu noarray=%lu mapwho=%lu visthings=%lu queued=%lu draw_view=%lu planes=%lu blocks=%lu revealed=%lu xdelta=%lu withthings=%lu area x%ld-%ld y%ld-%ld mapblocks_with_things=%lu",
+                    psp_ks[0], psp_ks[1], psp_ks[2], psp_ks[3], psp_ks[4], psp_ks[5], psp_ks[6], psp_ks[7], psp_ks[8], psp_ks[9], psp_ks[10], psp_ks[11], psp_ks[12], psp_ks[13], psp_ks[14], psp_ks[15], psp_minx, psp_maxx, psp_miny, psp_maxy, count_blocks_with_things());
+                psp_minx = 9999; psp_maxx = -1; psp_miny = 9999; psp_maxy = -1;
+                memset(psp_ks, 0, sizeof(psp_ks));
             }
             psp_write_status(buf);
 #if defined(KFX_PSP_MEMDEBUG)

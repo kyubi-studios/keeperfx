@@ -739,10 +739,26 @@ struct WibbleTable *get_wibble_from_table(struct Camera *cam, long table_index, 
     return &blank_wibble_table[table_index];
 }
 
+#if defined(KFX_PSP)
+unsigned long psp_poly_drops, psp_poly_peak;
+/* 0 jonty items, 1 process_keeper_sprite, 2 heap fail, 3 invalid idx, 4 unallocated, 5 submitted, 6 no sprite array */
+unsigned long psp_ks[16];
+long psp_minx = 9999, psp_maxx = -1, psp_miny = 9999, psp_maxy = -1;
+#define PSP_KS(i) (psp_ks[i]++)
+#else
+#define PSP_KS(i) ((void)0)
+#endif
 static struct BasicQ *get_bucket_item(int min_cor_z, enum QKinds kind, size_t size, int *out_bckt_idx)
 {
+#if defined(KFX_PSP)
+    if ((unsigned long)(getpoly - poly_pool) > psp_poly_peak)
+        psp_poly_peak = (unsigned long)(getpoly - poly_pool);
+#endif
     if (getpoly >= poly_pool_end)
     {
+#if defined(KFX_PSP)
+        psp_poly_drops++;
+#endif
         return NULL;
     }
 
@@ -4450,6 +4466,9 @@ static void do_a_plane_of_engine_columns_cluedo(long stl_x, long stl_y, long pla
     int xidx;
     int xdelta;
     xdelta = xbval - xaval;
+#if defined(KFX_PSP)
+    psp_ks[14] += (xdelta > 0) ? xdelta : 0;
+#endif
     const struct Column *unrev_colmn;
     unrev_colmn = get_column(game.unrevealed_column_idx);
     for (xidx=0; xidx < xdelta; xidx++)
@@ -4634,6 +4653,7 @@ static void do_a_plane_of_engine_columns_cluedo(long stl_x, long stl_y, long pla
 
 static void do_a_plane_of_engine_columns_isometric(long stl_x, long stl_y, long plane_start, long plane_end)
 {
+    PSP_KS(11);
     if ((stl_y < 1) || (stl_y > game.map_subtiles_y - 1)) {
         return;
     }
@@ -4667,6 +4687,16 @@ static void do_a_plane_of_engine_columns_isometric(long stl_x, long stl_y, long 
         // Get column to be drawn
         const struct Column *cur_colmn;
         cur_colmn = unrev_colmn;
+        PSP_KS(12);
+        if (map_block_revealed(cur_mapblk, my_player_number))
+        {
+            PSP_KS(13);
+#if defined(KFX_PSP)
+            if (get_mapwho_thing_index(cur_mapblk) != 0) psp_ks[15]++;
+            { extern long psp_minx, psp_maxx, psp_miny, psp_maxy; long xx = stl_x + xaval + xidx;
+              if (xx < psp_minx) psp_minx = xx; if (xx > psp_maxx) psp_maxx = xx; if (stl_y < psp_miny) psp_miny = stl_y; if (stl_y > psp_maxy) psp_maxy = stl_y; }
+#endif
+        }
         if (map_block_revealed(cur_mapblk, my_player_number))
         {
             long i;
@@ -6592,6 +6622,7 @@ void display_drawlist(void) // Draws isometric and 1st person view. Not frontvie
                 draw_subdivided_near_polygon(item.polygonNearFP);
                 break;
             case QK_JontySprite: // All creatures and things in isometric and 1st person view
+                PSP_KS(0);
                 draw_jonty_mapwho(item.jontySprite);
                 break;
             case QK_CreatureShadow: // Shadows of creatures in isometric and 1st person view
@@ -6764,6 +6795,7 @@ void draw_view(struct Camera *cam, unsigned char a2)
     long aposc;
     long bposc;
     SYNCDBG(9,"Starting");
+    PSP_KS(10);
     calculate_hud_scale(cam);
     camera_zoom = scale_camera_zoom_to_screen(cam->zoom);
     zoom_mem = cam->zoom;//TODO [zoom] remove when all cam->zoom will be changed to camera_zoom
@@ -6918,6 +6950,7 @@ void display_fast_drawlist(struct Camera *cam) // Draws frontview only. Not isom
             switch (item.b->kind)
             {
             case QK_JontySprite: // Creatures and things
+                PSP_KS(0);
                 draw_fastview_mapwho(cam, item.jontySprite);
                 break;
             case QK_SlabSelector: // Selection outline box for placing/digging slabs
@@ -7047,6 +7080,7 @@ static void add_thing_sprite_to_polypool(struct Thing *thing, long scr_x, long s
     else
     if (bckt_idx < 0)
         bckt_idx = 0;
+    PSP_KS(9);
     poly = (struct BucketKindJontySprite *)getpoly;
     getpoly += sizeof(struct BucketKindJontySprite);
     poly->b.next = buckets[bckt_idx];
@@ -7750,6 +7784,7 @@ static void draw_keepersprite(const struct SpriteScale *sprite_scale, const stru
     if ((kspr_idx < 0)
         || ((kspr_idx >= KEEPSPRITE_LENGTH) && (kspr_idx < KEEPERSPRITE_ADD_OFFSET))
         || (kspr_idx > (KEEPERSPRITE_ADD_NUM + KEEPERSPRITE_ADD_OFFSET))) {
+        PSP_KS(3);
         WARNDBG(9,"Invalid KeeperSprite %ld at (%ld,%ld) size (%u,%u) alpha %d",
             kspr_idx, (long)sprite_scale->content_x, (long)sprite_scale->content_y, kspr->SWidth, kspr->SHeight, (int)EngineSpriteDrawUsingAlpha);
         return;
@@ -7771,10 +7806,12 @@ static void draw_keepersprite(const struct SpriteScale *sprite_scale, const stru
         }
     }
     if (sprite_data_ptr == NULL || *sprite_data_ptr == NULL) {
+        PSP_KS(4);
         WARNDBG(9,"Unallocated KeeperSprite %ld can't be drawn at (%ld,%ld)",kspr_idx,(long)sprite_scale->content_x,(long)sprite_scale->content_y);
         return;
     }
 
+    PSP_KS(5);
     RendererSubmitKeeperSprite(sprite_scale,
             *sprite_data_ptr, kspr->SWidth, kspr->SHeight, (int32_t)clipped_height,
             (unsigned int)RendererGetDrawFlags(),
@@ -7911,8 +7948,10 @@ void process_keeper_sprite(short x, short y, unsigned short kspr_base, short ksp
     long cutoff;
     SYNCDBG(17, "At (%d,%d) opts %d %d %d %d", (int)x, (int)y, (int)kspr_base, (int)kspr_angle, (int)sprgroup, (int)scale);
     player = get_my_player();
+    PSP_KS(1);
     creature_sprites = keepersprite_array(kspr_base);
     if (creature_sprites == NULL) {
+        PSP_KS(6);
         return;
     }
     if (creature_sprites->FramesCount == 0) {
@@ -7984,6 +8023,7 @@ void process_keeper_sprite(short x, short y, unsigned short kspr_base, short ksp
     {
         if (!heap_manage_keepersprite(kspr_idx))
         {
+            PSP_KS(2);
             return;
         }
         kspr = &creature_sprites[sprite_group];
@@ -8000,6 +8040,7 @@ void process_keeper_sprite(short x, short y, unsigned short kspr_base, short ksp
     {
         if (!heap_manage_keepersprite(kspr_idx))
         {
+            PSP_KS(2);
             return;
         }
         kspr = &creature_sprites[sprite_group + sprite_rot * (long)creature_sprites->FramesCount];
@@ -9022,6 +9063,7 @@ static void do_map_who(short tnglist_idx)
     long i;
     unsigned long k;
     k = 0;
+    PSP_KS(7);
     i = tnglist_idx;
     while (i != 0)
     {
@@ -9037,6 +9079,7 @@ static void do_map_who(short tnglist_idx)
         // Per thing code start
         if ((thing->rendering_flags & TRF_Invisible) == 0)
         {
+            PSP_KS(8);
             do_map_who_for_thing(thing);
         }
         // Per thing code end

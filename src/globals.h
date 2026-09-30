@@ -336,6 +336,16 @@ typedef uint32_t TbMapLocation;
 /** Controller buttons state. flags field, each bit represents a button */
 typedef uint64_t TbControllerButtons; 
 
+/* The subtile view of a coordinate relies on 'num' starting at byte 1 of
+ * 'val' (bits 8-23), which needs byte packing. Where headers aren't packed
+ * (PSP, KFX_NATURAL_ALIGNMENT) it is packed explicitly, so GCC also knows
+ * 'num' is misaligned and reads it bytewise instead of faulting. */
+#if defined(KFX_NATURAL_ALIGNMENT)
+#define KFX_STL_PACKED __attribute__((packed))
+#else
+#define KFX_STL_PACKED
+#endif
+
 /**
  * Stores a 2d coordinate (x,y).
  *
@@ -350,14 +360,14 @@ struct Coord2d {
       struct { // subtile
         uint8_t pos; /**< x.stl.pos - coord x position (relative to subtile) */
         uint16_t num; /**< x.stl.num - subtile x position (relative to whole map) */
-        } stl;
+        } KFX_STL_PACKED stl;
     } x;
     union { // y position
       int32_t val; /**< y.val - coord y position (relative to whole map) */
       struct { // subtile
         uint8_t pos; /**< y.stl.pos - coord y position (relative to subtile) */
         uint16_t num; /**< y.stl.num - subtile y position (relative to whole map) */
-        } stl;
+        } KFX_STL_PACKED stl;
     } y;
 };
 
@@ -375,21 +385,21 @@ struct Coord3d {
       struct { // subtile
         uint8_t pos; /**< x.stl.pos - coord x position (relative to subtile) */
         uint16_t num; /**< x.stl.num - subtile x position (relative to whole map) */
-        } stl;
+        } KFX_STL_PACKED stl;
     } x;
     union { // y position
       int32_t val; /**< y.val - coord y position (relative to whole map) */
       struct { // subtile
         uint8_t pos; // y.stl.pos - coord y position (relative to subtile) */
         uint16_t num; // y.stl.num - subtile y position (relative to whole map) */
-        } stl;
+        } KFX_STL_PACKED stl;
     } y;
     union { // z position
       int32_t val; /**< z.val - coord z position (relative to whole map) */
       struct { // subtile
         uint8_t pos; /**< z.stl.pos - coord z position (relative to subtile) */
         uint16_t num; /**< z.stl.num - subtile z position (relative to whole map) */
-        } stl;
+        } KFX_STL_PACKED stl;
     } z;
 };
 
@@ -399,21 +409,21 @@ struct CoordDelta3d {
       struct {
         uint8_t pos;
         int16_t num;
-        } stl;
+        } KFX_STL_PACKED stl;
     } x;
     union {
       int32_t val;
       struct {
         uint8_t pos;
         int16_t num;
-        } stl;
+        } KFX_STL_PACKED stl;
     } y;
     union {
       int32_t val;
       struct {
         uint8_t pos;
         int16_t num;
-        } stl;
+        } KFX_STL_PACKED stl;
     } z;
 };
 
