@@ -352,3 +352,8 @@ Her madde: **belirti → kök neden → çözüm**. Sıra, karşılaşılma sır
   yaratık (log'daki `MAPCREATURELIMIT` uyarıları bundan).
 - Kayıt dosyaları masaüstü sürümüyle uyumlu değil (farklı yapı düzeni).
 - İlk açılış, sprite önbelleğini yazdığı için sonrakilerden yavaştır.
+
+### Sorun 24: Elde tutulan imp zindana bırakılamıyor
+- **Belirti:** Panelden alınan imp elde görünüyor, küp yeşil/kırmızı oluyor ama × bir şey yapmıyor.
+- **Neden:** DK'de eldeki yaratığı bırakmak sağ tık; × sol tık olduğu için sadece büyü/oda işleri yapıyordu.
+- **Çözüm:** `packets_input.c` içinde PSP'ye özel: sol tık bırakıldığında el doluysa ve imleç altında alınacak yaratık yoksa `dump_first_held_thing_on_map` çağrılıyor. Kırmızı küpte bırakma başarısız olur, hiçbir şey olmaz. Yaratığın üstündeyken × onu almaya devam eder.
