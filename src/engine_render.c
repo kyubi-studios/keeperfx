@@ -7517,6 +7517,28 @@ void keepersprite_heap_trim(void)
     }
 }
 
+/** Frees the least recently drawn frames not used in the current frame; false if none are left. */
+static TbBool keepersprite_evict_oldest(void)
+{
+    long oldest = -1;
+    for (long i = 0; i < KEEPSPRITE_LENGTH; i++)
+    {
+        if (sprite_heap_handle[i] == NULL || keepsprite_last_use[i] >= keepsprite_use_clock)
+            continue;
+        if (oldest < 0 || keepsprite_last_use[i] < keepsprite_last_use[oldest])
+            oldest = i;
+    }
+    if (oldest < 0)
+        return false;
+    const uint32_t stamp = keepsprite_last_use[oldest];
+    for (long i = 0; i < KEEPSPRITE_LENGTH; i++)
+    {
+        if (sprite_heap_handle[i] != NULL && keepsprite_last_use[i] == stamp)
+            keepsprite_free_frame(i);
+    }
+    return true;
+}
+
 void keepersprite_heap_free_all(void)
 {
     for (long i = 0; i < KEEPSPRITE_LENGTH; i++)
@@ -7533,8 +7555,20 @@ static long load_single_frame(TbSpriteData *data_ptr, unsigned short kspr_idx)
     nlength = creature_table[kspr_idx+1].DataOffset - creature_table[kspr_idx].DataOffset;
     *data_ptr = he_alloc(nlength);
 #if defined(KFX_KEEPSPRITE_BUDGET)
+    // Out of memory: make room from frames not drawn this frame rather than
+    // silently skipping this sprite (the power hand vanished on the PSP).
+    while ((*data_ptr == NULL) && keepersprite_evict_oldest())
+        *data_ptr = he_alloc(nlength);
     if (*data_ptr == NULL)
+    {
+        static TbBool warned = false;
+        if (!warned) {
+            WARNLOG("Out of memory loading keeper sprite %d (%ld bytes, %lu cached)",
+                (int)kspr_idx, nlength, (unsigned long)keepsprite_loaded_bytes);
+            warned = true;
+        }
         return 0;
+    }
     keepsprite_size[kspr_idx] = nlength;
     keepsprite_loaded_bytes += nlength;
 #endif
