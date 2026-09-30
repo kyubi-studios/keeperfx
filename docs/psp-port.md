@@ -357,3 +357,14 @@ Her madde: **belirti → kök neden → çözüm**. Sıra, karşılaşılma sır
 - **Belirti:** Panelden alınan imp elde görünüyor, küp yeşil/kırmızı oluyor ama × bir şey yapmıyor.
 - **Neden:** DK'de eldeki yaratığı bırakmak sağ tık; × sol tık olduğu için sadece büyü/oda işleri yapıyordu.
 - **Çözüm:** `packets_input.c` içinde PSP'ye özel: sol tık bırakıldığında el doluysa ve imleç altında alınacak yaratık yoksa `dump_first_held_thing_on_map` çağrılıyor. Kırmızı küpte bırakma başarısız olur, hiçbir şey olmaz. Yaratığın üstündeyken × onu almaya devam eder.
+
+### Sorun 25: Yaratıklar, objeler ve ışıklar haritada görünmüyor
+- **Belirti:** İmpler haritada görünmüyor ama kazıyorlar; el imleci bazen kayboluyor; sahne çok karanlık.
+- **Teşhis:** Oyun içi `psp_status.txt` (her ~3 sn yazılır, kapatıldığı için HOME ile çıkışta kaybolmaz) çizim sayaçlarını gösterdi: `draw_view` her karede çalışıyor ama `do_map_who` hiç çağrılmıyor. Tüm haritada nesne listesi dolu tek blok vardı; impin `x.val=31104` iken `x.stl.num=0` idi.
+- **Neden:** `Coord2d/Coord3d` içindeki `stl { uint8_t pos; uint16_t num; }` yapısı `val` ile aynı birlikte (union) duruyor ve `num`'un `val`'in 8–23. bitleri olması için 1. bayttan başlaması gerekiyor. PSP'de başlıklardaki `#pragma pack(1)` kaldırılınca (Sorun: hizasız erişim) `num` 2. bayta kaydı. Bütün nesneler (0,0) karesine kaydoldu.
+- **Çözüm:** `globals.h`'de bu iç yapılar `KFX_NATURAL_ALIGNMENT` altında `__attribute__((packed))` (`KFX_STL_PACKED`); GCC `num`'u bayt bayt okur, gerçek PSP'de hizasız erişim hatası olmaz. `game_legacy.c`'deki `_Static_assert`'ler yerleşimi sabitler.
+- **Ders:** Paketlemeyi kaldırırken sadece boyut/hizaya değil, başka alanlarla bayt örtüşmesine dayanan union'lara da bakılmalı.
+
+### Sorun 26: Oyun içi bellek yetmiyor (gerçek PSP)
+- `psp_status.txt`: en büyük boş blok 431 KB (emülatörde 5.8 MB). `KFX_PSP_MEMDEBUG=ON` sürümü oyun içinde canlı heap'i çağırana göre döker (`memdebug.log`, adresler `psp-addr2line` ile çözülür).
+- Kazanımlar: Druid/Maiden/Time Mage sprite zip'leri `fxdata_unused/`'a taşındı (~1.9 MB), rekor tablosu 9999→100 kayıt (703 KB), sprite önbellek dosyaları için tek statik stdio tamponu (768 KB), göz lensi efektleri kapalı (640 KB). Sonrası: en büyük boş blok ~3.5 MB.
