@@ -19,6 +19,7 @@
 #include "pre_inc.h"
 #include "kfx/renderer/RendererManager.h"
 #include "power_hand.h"
+#include "bflib_mouse.h"
 
 #include "globals.h"
 #include "bflib_basics.h"
@@ -544,6 +545,48 @@ void draw_power_hand(void)
     struct RoomConfigStats* roomst;
     player = get_my_player();
     struct UserState* ustate = get_user_state(get_local_user());
+#if defined(KFX_PSP)
+    { // PSP diagnostics: in-game pointer / power hand state
+        static int cnt;
+        if ((cnt++ % 90) == 0) {
+            extern size_t keepersprite_loaded_bytes(void);
+            const struct TbSprite *s = NULL; int32_t px = 0, py = 0; int u = 0;
+            TbBool ok = LbMouseGetActivePointerSprite(&s, &px, &py, &u);
+            struct Thing *htng = thing_get(player->hand_thing_idx);
+            char buf[1024];
+            snprintf(buf, sizeof(buf),
+                "turn %lu mouse %d,%d pointer ok=%d spr=%p at %d,%d\n"
+                "hand idx=%d exists=%d anim=%d frame=%d rflags=0x%x pos=%d,%d,%d\n"
+                "under=%d ws=%d vt=%d pcs=%d scs=%d dnu=%d sms=%d busy=%lu instance=%d\n"
+                "keepsprites %lu bytes",
+                (unsigned long)get_gameturn(), (int)GetMouseX(), (int)GetMouseY(), (int)ok, (const void*)s, (int)px, (int)py,
+                (int)player->hand_thing_idx, (int)thing_exists(htng), thing_exists(htng) ? (int)htng->anim_sprite : -1,
+                thing_exists(htng) ? (int)htng->current_frame : -1, thing_exists(htng) ? (unsigned)htng->rendering_flags : 0,
+                thing_exists(htng) ? (int)htng->mappos.x.val : 0, thing_exists(htng) ? (int)htng->mappos.y.val : 0, thing_exists(htng) ? (int)htng->mappos.z.val : 0,
+                (int)local_state.local_thing_under_hand, (int)player->work_state, (int)player->view_type,
+                (int)ustate->primary_cursor_state, (int)ustate->secondary_cursor_state, (int)local_state.display_needs_update,
+                (int)game.small_map_state, (unsigned long)player->hand_busy_until_turn, (int)player->instance_num,
+                (unsigned long)keepersprite_loaded_bytes());
+            {
+                struct Dungeon *dg = get_players_dungeon(player);
+                struct Thing *imp = thing_get(dg->digger_list_start);
+                size_t n = strlen(buf);
+                if (thing_exists(imp)) {
+                    int32_t di = 0; const unsigned char *dd = NULL; int sw = 0, sh = 0; const struct KeeperSprite *ks = NULL;
+                    TbBool rok = resolve_keepersprite_draw_data(imp->anim_sprite, imp->move_angle_xy, imp->current_frame, &di, &dd, &sw, &sh, &ks);
+                    snprintf(buf + n, sizeof(buf) - n,
+                        "\nimp idx=%d anim=%d frame=%d rflags=0x%x alloc=0x%x pos=%d,%d,%d resolve=%d data=%p size=%dx%d drawidx=%ld",
+                        (int)imp->index, (int)imp->anim_sprite, (int)imp->current_frame, (unsigned)imp->rendering_flags,
+                        (unsigned)imp->alloc_flags, (int)imp->mappos.x.val, (int)imp->mappos.y.val, (int)imp->mappos.z.val,
+                        (int)rok, (const void*)dd, sw, sh, (long)di);
+                } else {
+                    snprintf(buf + n, sizeof(buf) - n, "\nno imp (digger list %d)", (int)dg->digger_list_start);
+                }
+            }
+            psp_write_status(buf);
+        }
+    }
+#endif
     if (local_state.display_needs_update)
         return;
     if (game.small_map_state == 2)

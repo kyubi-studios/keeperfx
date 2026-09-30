@@ -7539,6 +7539,8 @@ static TbBool keepersprite_evict_oldest(void)
     return true;
 }
 
+size_t keepersprite_loaded_bytes(void) { return keepsprite_loaded_bytes; }
+
 void keepersprite_heap_free_all(void)
 {
     for (long i = 0; i < KEEPSPRITE_LENGTH; i++)

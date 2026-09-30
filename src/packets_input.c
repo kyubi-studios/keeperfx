@@ -531,7 +531,16 @@ TbBool process_dungeon_control_packet_dungeon_control(NetUserId user)
         {
             if (!power_hand_is_empty(player) && (!ustate->one_click_lock_cursor))
             {
+#if defined(KFX_PSP)
+                // PSP: cross places the held thing, the back button cancels:
+                // it goes back to where it was picked up instead.
+                struct Thing *heldtng = get_first_thing_in_power_hand(player);
+                MapSubtlCoord back_stl_x = thing_exists(heldtng) ? heldtng->mappos.x.stl.num : stl_x;
+                MapSubtlCoord back_stl_y = thing_exists(heldtng) ? heldtng->mappos.y.stl.num : stl_y;
+                if (dump_first_held_thing_on_map(player->id_number, back_stl_x, back_stl_y, 1)) {
+#else
                 if (dump_first_held_thing_on_map(player->id_number, stl_x, stl_y, 1)) {
+#endif
                     if ((pckt->control_flags & PCtr_LBtnHeld) == 0)
                     {
                         ustate->cursor_button_down = 0;

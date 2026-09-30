@@ -123,6 +123,18 @@ extern "C" void psp_log_memory(const char* where)
         (unsigned)(sceKernelTotalFreeMemSize() / 1024));
 }
 
+/** Rewrites psp_status.txt (closed each time, so it survives a HOME exit). */
+extern "C" void psp_write_status(const char* text)
+{
+    FILE* f = fopen("psp_status.txt", "w");
+    if (f == NULL)
+        return;
+    struct mallinfo mi = mallinfo();
+    fprintf(f, "%s\nheap used %u KB, largest free block %u KB, system free %u KB\n", text,
+        (unsigned)(mi.uordblks / 1024), largest_heap_block_kb(), (unsigned)(sceKernelTotalFreeMemSize() / 1024));
+    fclose(f);
+}
+
 // Written before anything else, so there is a trace even if the game dies
 // before keeperfx.log is created.
 static void write_boot_report(void)
