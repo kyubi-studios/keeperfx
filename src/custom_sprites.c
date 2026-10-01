@@ -31,6 +31,10 @@
 #include "net_checksums.h"
 #include "sprites.h"
 #include "config_spritecolors.h"
+#include "config_creature.h"
+#include "thing_list.h"
+#include "config.h"
+#include <ctype.h>
 #include <spng.h>
 #include <json.h>
 #include <json-dom.h>
@@ -532,6 +536,122 @@ static void describe_custom_sprite_sources(LevelNumber lvnum, char *buf, size_t 
 }
 #endif
 
+#if defined(KFX_PSP)
+/*
+ * Sprite zips for KeeperFX's extra creatures. No original campaign uses them
+ * and together they take ~2 MB of the PSP's heap, so they are only loaded for
+ * a level that mentions the creature in its script or places it on the map.
+ */
+static const struct { const char *zip; const char *creature; } optional_sprite_zips[] = {
+    {"druid.zip",     "DRUID"},
+    {"maiden.zip",    "MAIDEN"},
+    {"time_mage.zip", "TIME_MAGE"},
+};
+#define OPTIONAL_SPRITE_ZIP_COUNT (int)(sizeof(optional_sprite_zips) / sizeof(optional_sprite_zips[0]))
+
+static int optional_sprite_zip_index(const char *zip)
+{
+    for (int i = 0; i < OPTIONAL_SPRITE_ZIP_COUNT; i++)
+        if (strcasecmp(zip, optional_sprite_zips[i].zip) == 0)
+            return i;
+    return -1;
+}
+
+static unsigned char *load_level_file(LevelNumber lvnum, const char *ext, long *len)
+{
+    const char *fname = prepare_file_fmtpath(get_level_fgroup(lvnum), "map%05lu.%s", (unsigned long)lvnum, ext);
+    *len = (fname[0] != '\0') ? LbFileLengthRnc(fname) : -1;
+    if (*len <= 0)
+        return NULL;
+    unsigned char *buf = (unsigned char *)malloc(*len + 1);
+    if (buf == NULL)
+        return NULL;
+    if (LbFileLoadAt(fname, buf) != *len) {
+        free(buf);
+        return NULL;
+    }
+    buf[*len] = '\0';
+    return buf;
+}
+
+/** Case-insensitive whole-word search; script tokens are A-Z, 0-9 and '_'. */
+static TbBool text_has_word(const char *text, long len, const char *word)
+{
+    const size_t wlen = strlen(word);
+    for (long i = 0; i + (long)wlen <= len; i++)
+    {
+        if (strncasecmp(&text[i], word, wlen) != 0)
+            continue;
+        const char before = (i > 0) ? text[i - 1] : ' ';
+        const char after = (i + (long)wlen < len) ? text[i + wlen] : ' ';
+        if (!isalnum((unsigned char)before) && before != '_' && !isalnum((unsigned char)after) && after != '_')
+            return true;
+    }
+    return false;
+}
+
+/** Bit i set: the level uses optional_sprite_zips[i]'s creature. */
+static unsigned level_optional_sprite_zip_mask(LevelNumber lvnum)
+{
+    if (lvnum <= 0)
+        return 0;
+    unsigned mask = 0;
+    ThingModel models[OPTIONAL_SPRITE_ZIP_COUNT];
+    for (int i = 0; i < OPTIONAL_SPRITE_ZIP_COUNT; i++)
+        models[i] = get_id(creature_desc, optional_sprite_zips[i].creature);
+    long len;
+    // Scripts name the creatures (pools, parties, ADD_CREATURE_TO_LEVEL...).
+    const char *script_exts[] = {"txt", "lua"};
+    for (int e = 0; e < 2; e++)
+    {
+        char *text = (char *)load_level_file(lvnum, script_exts[e], &len);
+        if (text == NULL)
+            continue;
+        for (int i = 0; i < OPTIONAL_SPRITE_ZIP_COUNT; i++)
+            if (text_has_word(text, len, optional_sprite_zips[i].creature))
+                mask |= 1u << i;
+        free(text);
+    }
+    // Creatures placed on the map: text thing file...
+    char *text = (char *)load_level_file(lvnum, "tngfx", &len);
+    if (text != NULL)
+    {
+        for (char *p = strstr(text, "\"Creature\""); p != NULL; p = strstr(p + 1, "\"Creature\""))
+        {
+            char *sub = strstr(p, "Subtype");
+            char *next = strstr(p + 1, "[thing");
+            if (sub == NULL || (next != NULL && sub > next))
+                continue;
+            sub = strchr(sub, '=');
+            if (sub == NULL)
+                continue;
+            long model = atol(sub + 1);
+            for (int i = 0; i < OPTIONAL_SPRITE_ZIP_COUNT; i++)
+                if (models[i] > 0 && model == models[i])
+                    mask |= 1u << i;
+        }
+        free(text);
+    }
+    // ...and the legacy binary one (21-byte records after a 2-byte count).
+    unsigned char *tng = load_level_file(lvnum, "tng", &len);
+    if (tng != NULL)
+    {
+        for (long pos = 2; pos + 21 <= len; pos += 21)
+        {
+            if (tng[pos + 6] != TCls_Creature)
+                continue;
+            for (int i = 0; i < OPTIONAL_SPRITE_ZIP_COUNT; i++)
+                if (models[i] > 0 && tng[pos + 7] == models[i])
+                    mask |= 1u << i;
+        }
+        free(tng);
+    }
+    return mask;
+}
+
+static unsigned optional_sprite_zip_mask;
+#endif
+
 void init_custom_sprites(LevelNumber lvnum)
 {
     SYNCDBG(8, "Starting");
@@ -541,6 +661,8 @@ void init_custom_sprites(LevelNumber lvnum)
         char sources[2048];
         LevelNumber src_lvnum = (lvnum == SPRITE_LAST_LEVEL) ? game.last_level : lvnum;
         describe_custom_sprite_sources(src_lvnum, sources, sizeof(sources));
+        optional_sprite_zip_mask = level_optional_sprite_zip_mask(src_lvnum);
+        snprintf(sources + strlen(sources), sizeof(sources) - strlen(sources), "optional:%x|", optional_sprite_zip_mask);
         if (custom_sprites != NULL && strcmp(sources, loaded_sources) == 0)
         {
             if (lvnum > 0 && lvnum != SPRITE_LAST_LEVEL)
@@ -619,6 +741,11 @@ void init_custom_sprites(LevelNumber lvnum)
         const char *loaded_zip_name_sep = "";
         int cnt_sprite = 0, cnt_icon = 0;
         for (int i = 0; i < REQUIRED_SPRITE_ZIP_COUNT; i++) {
+#if defined(KFX_PSP)
+            int opt = optional_sprite_zip_index(required_sprite_zips[i]);
+            if (opt >= 0 && (optional_sprite_zip_mask & (1u << opt)) == 0)
+                continue;
+#endif
             sprintf(full_path, "%s/%s", dname, required_sprite_zips[i]);
             if (!LbFileExists(full_path)) {
                 ERRORLOG("Required /fxdata/%s is missing", required_sprite_zips[i]);

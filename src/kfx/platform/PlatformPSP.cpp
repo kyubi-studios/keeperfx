@@ -20,6 +20,7 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <malloc.h>
+#include <unistd.h>
 #include "post_inc.h"
 
 /* Take all user memory for the newlib heap except 4 MB kept back for thread
@@ -115,6 +116,31 @@ static unsigned int largest_heap_block_kb(void)
     return lo;
 }
 
+/* Highest heap address, found once at boot: libcglue's sbrk limit isn't exported. */
+static char* psp_heap_top;
+
+static void find_heap_top(void)
+{
+    const unsigned int kb = largest_heap_block_kb();
+    char* volatile p = (char*)malloc((size_t)kb * 1024);
+    if (p != NULL) {
+        p[0] = 0;
+        psp_heap_top = p + (size_t)kb * 1024;
+        free(p);
+    }
+}
+
+/** Free heap bytes: free space inside the arena plus what sbrk can still hand out. */
+extern "C" size_t psp_heap_free_bytes(void)
+{
+    struct mallinfo mi = mallinfo();
+    size_t unsbrked = 0;
+    char* brk = (char*)sbrk(0);
+    if (psp_heap_top != NULL && brk != (char*)-1 && brk < psp_heap_top)
+        unsbrked = (size_t)(psp_heap_top - brk);
+    return (size_t)mi.fordblks + unsbrked;
+}
+
 extern "C" void psp_log_memory(const char* where)
 {
     struct mallinfo mi = mallinfo();
@@ -130,8 +156,9 @@ extern "C" void psp_write_status(const char* text)
     if (f == NULL)
         return;
     struct mallinfo mi = mallinfo();
-    fprintf(f, "%s\nheap used %u KB, largest free block %u KB, system free %u KB\n", text,
-        (unsigned)(mi.uordblks / 1024), largest_heap_block_kb(), (unsigned)(sceKernelTotalFreeMemSize() / 1024));
+    fprintf(f, "%s\nheap used %u KB, heap free %u KB, largest free block %u KB, system free %u KB\n", text,
+        (unsigned)(mi.uordblks / 1024), (unsigned)(psp_heap_free_bytes() / 1024), largest_heap_block_kb(),
+        (unsigned)(sceKernelTotalFreeMemSize() / 1024));
     fclose(f);
 }
 
@@ -154,6 +181,7 @@ static void write_boot_report(void)
 
 int main(int argc, char *argv[])
 {
+    find_heap_top();
     write_boot_report();
     // Homebrew starts at 222 MHz; the game needs the full 333 MHz.
     scePowerSetClockFrequency(333, 333, 166);

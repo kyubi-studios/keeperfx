@@ -30,7 +30,12 @@ extern "C" {
 #endif
 /******************************************************************************/
 
+#if defined(KFX_PSP)
+// The base game defines 10 traps and 7 doors; 2000 slots cost ~900 KB here.
+#define TRAPDOOR_TYPES_MAX 128
+#else
 #define TRAPDOOR_TYPES_MAX 2000
+#endif
 
 /******************************************************************************/
 struct DoorConfigStats {

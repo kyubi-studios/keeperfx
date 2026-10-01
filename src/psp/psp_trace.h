@@ -8,6 +8,8 @@ extern "C" {
 void psp_phase(const char* name);
 void psp_log_memory(const char* where);
 void psp_write_status(const char* text);
+#include <stddef.h>
+size_t psp_heap_free_bytes(void);
 #ifdef __cplusplus
 }
 #endif

@@ -7524,10 +7524,23 @@ static void keepsprite_free_frame(long i)
 void keepersprite_heap_trim(void)
 {
     keepsprite_use_clock++;
-    if (keepsprite_loaded_bytes <= KFX_KEEPSPRITE_BUDGET)
-        return;
-    // Evict down to 3/4 of the budget so this doesn't run every frame.
-    const size_t target = KFX_KEEPSPRITE_BUDGET / 4 * 3;
+    size_t target;
+#if defined(KFX_PSP)
+    // When the heap runs low (busy fan maps), give memory back early instead
+    // of waiting for an allocation to fail somewhere less forgiving.
+    static unsigned check_clock;
+    if (((check_clock++ & 15) == 0) && (keepsprite_loaded_bytes > KFX_KEEPSPRITE_BUDGET / 2)
+        && (psp_heap_free_bytes() < 1536 * 1024))
+    {
+        target = KFX_KEEPSPRITE_BUDGET / 2;
+    } else
+#endif
+    {
+        if (keepsprite_loaded_bytes <= KFX_KEEPSPRITE_BUDGET)
+            return;
+        // Evict down to 3/4 of the budget so this doesn't run every frame.
+        target = KFX_KEEPSPRITE_BUDGET / 4 * 3;
+    }
     while (keepsprite_loaded_bytes > target)
     {
         long oldest = -1;
