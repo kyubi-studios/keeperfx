@@ -10,6 +10,47 @@
 [Visit our website](https://keeperfx.net) | [Join our Discord (Keeper Klan)](https://discord.gg/hE4p7vy2Hb)
 
 
+## PlayStation Portable (PSP) port
+This branch (`psp-port`) is an unofficial port of KeeperFX to the Sony PSP, maintained in the
+[kyubi-studios fork](https://github.com/kyubi-studios/keeperfx/tree/psp-port). It is not supported by the KeeperFX team,
+so please report PSP issues to this fork, not upstream.
+
+- **Hardware:** PSP-2000, 3000 or Go running custom firmware (PRO, LME, ARK, Infinity). The PSP-1000 does not have enough memory.
+- **Status:** The intro video, main menu, campaign map and level 1 run on real hardware. Memory and speed are still tight.
+
+### Building
+Requires the [pspdev](https://github.com/pspdev/pspdev) toolchain (psp-gcc, SDL3, SDL3_mixer, OpenAL, Lua 5.4).
+
+```sh
+export PSPDEV=~/pspdev PATH=~/pspdev/bin:$PATH
+psp-cmake -S . -B out-psp -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja -C out-psp keeperfx          # -> out-psp/EBOOT.PBP
+```
+
+### Installing
+You need your own copy of the original Dungeon Keeper files (for example the GOG edition, which can be extracted on Linux
+with `innoextract`) and an extracted KeeperFX "complete" release archive. Then assemble the memory stick folder:
+
+```sh
+psp/make_psp_package.sh <dk_dir> <kfx_release_dir> out-psp/EBOOT.PBP <out_dir>
+```
+
+Copy `<out_dir>` to `ms0:/PSP/GAME/KeeperFX/` (about 650 MB), with `EBOOT.PBP` directly inside that folder.
+
+### Controls
+| Button | Action |
+|---|---|
+| Analog stick | Cursor |
+| Cross | Select (left click) |
+| Triangle | Back: right click in game, Escape in menus |
+| Circle / Square | Zoom in / out |
+| L / R | Rotate camera (switch ability while possessing a creature) |
+| D-pad | Scroll the map |
+| Start / Select | Menu / map |
+
+Build options, porting notes and known issues are in [docs/psp-port.md](docs/psp-port.md) (Turkish).
+
+
 ## Intro
 KeeperFX (Dungeon Keeper Fan eXpansion) is an open-source project that aims to fix up, enhance and modernize 
 the classic dungeon management game, [Dungeon Keeper](https://en.wikipedia.org/wiki/Dungeon_Keeper).
