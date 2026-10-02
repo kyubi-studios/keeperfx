@@ -56,6 +56,20 @@ endif()
 
 install(TARGETS keeperfx RUNTIME DESTINATION .)
 install(TARGETS keeperfx_hvlog RUNTIME DESTINATION . OPTIONAL)
+
+# Linux without system SDL3 (e.g. Ubuntu 24.04): Dependencies.cmake builds SDL3
+# from source as shared libraries, which do not install themselves. Install
+# them next to the game and look for them there, or the installed keeperfx
+# cannot start (the build-tree RPATH is dropped on install). The Deck bundle
+# (DeckBundle.cmake) does its own library bundling into lib/.
+if(UNIX AND NOT KFX_DECK_BUNDLE AND TARGET SDL3-shared)
+    install(TARGETS SDL3-shared SDL3_image-shared SDL3_mixer-shared
+        LIBRARY DESTINATION . NAMELINK_SKIP)
+    set_target_properties(keeperfx PROPERTIES INSTALL_RPATH "$ORIGIN")
+    if(TARGET keeperfx_hvlog)
+        set_target_properties(keeperfx_hvlog PROPERTIES INSTALL_RPATH "$ORIGIN")
+    endif()
+endif()
 install(FILES "${CMAKE_BINARY_DIR}/keeperfx.map" DESTINATION . OPTIONAL)
 install(FILES "${CMAKE_BINARY_DIR}/keeperfx_hvlog.map" DESTINATION . OPTIONAL)
 
